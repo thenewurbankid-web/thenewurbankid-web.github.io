@@ -1,2 +1,3 @@
 qa/
-assets/src/
+assets/src/*
+!assets/src/song.mp3
