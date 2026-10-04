@@ -118,8 +118,8 @@ export const MOONS = [
     ],
     tags: ["Ollama", "TypeScript", "SQLite"],
     links: [
-      // Set live: true once https://thenewurbankid-web.github.io/construct/vision/ is published (it returned 404 on 2026-10-04).
-      { label: "Status", href: "https://thenewurbankid-web.github.io/construct/vision/", live: false, pending: "Status page coming" },
+      // Snapshot of runs and library on the Construct docs site (the "next" docs version), live since 2026-10-04.
+      { label: "Status", href: "https://thenewurbankid-web.github.io/construct/next/vision/", live: true },
     ],
     note: "Private code",
     preview: null, // drawn in code: blocks flowing into a library
