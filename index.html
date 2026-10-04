@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The New Urban Kid</title>
+<meta name="description" content="The New Urban Kid: games, tools and AI agent systems, shown as worlds in one star system.">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&family=Jost:wght@200;300;400&family=Sedgwick+Ave+Display&display=swap">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<h1 id="title" aria-label="The New Urban Kid"></h1>
+<p id="hint" class="mono" aria-hidden="true"></p>
+
+<div id="labels" aria-hidden="true"></div>
+
+<section id="panel" aria-live="polite" hidden>
+  <p class="kicker mono" id="p-kicker"></p>
+  <h2 id="p-name"></h2>
+  <p id="p-pitch"></p>
+  <ul id="p-facts"></ul>
+  <p id="p-tags" class="tags"></p>
+  <p id="p-moons" class="glyphs"></p>
+  <p id="p-links" class="glyphs"></p>
+  <a id="p-back" class="glyph back" href="#">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg><span>Back</span>
+  </a>
+</section>
+
+<section id="about" aria-live="polite" hidden>
+  <p class="kicker mono">The star</p>
+  <h2>The New Urban Kid</h2>
+  <p id="about-line"></p>
+  <p class="glyphs"><a id="about-gh" class="glyph" target="_blank" rel="noopener"></a></p>
+  <a id="about-back" class="glyph back" href="#">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6"/></svg><span>Back</span>
+  </a>
+</section>
+
+<button id="tilt" class="glyph mono" type="button" hidden>
+  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M3 9c-1 2-1 4 0 6M21 9c1 2 1 4 0 6"/></svg><span>Tilt</span>
+</button>
+
+<nav id="list" aria-label="Projects">
+  <h2>The New Urban Kid</h2>
+  <p>Builder of games, tools and AI agent systems. <a href="https://github.com/thenewurbankid-web">GitHub profile</a></p>
+  <ul>
+    <li><h3>Orbit</h3><p>A live mission-control view of Paperclip AI companies, drawn as a realistic space scene.</p>
+      <p><a href="https://thenewurbankid-web.github.io/orbit/">Live site</a> · <a href="https://github.com/thenewurbankid-web/orbit">Source</a></p></li>
+    <li><h3>A Vibe Called Quest</h3><p>A cozy 3D quest world where your AI work becomes quests.</p>
+      <p><a href="https://thenewurbankid-web.github.io/claude_quest/">Live site</a> · <a href="https://github.com/thenewurbankid-web/claude_quest">Source</a></p></li>
+    <li><h3>Bring The Ruckus</h3><p>A photoreal hip-hop street-boxing game, built phone first.</p>
+      <p><a href="https://thenewurbankid-web.github.io/bring-the-ruckus/">Live site</a> · <a href="https://github.com/thenewurbankid-web/bring-the-ruckus">Source</a></p></li>
+    <li><h3>Line framework</h3><p>Front-end development as a chain of deterministic blocks with closed options, AI-ready and System 1 first.</p>
+      <p><a href="https://thenewurbankid-web.github.io/construct/">Live site</a> · <a href="https://github.com/thenewurbankid-web/construct">Source</a></p>
+      <ul>
+        <li><h4>Construct</h4><p>The block framework and command line. <a href="https://thenewurbankid-web.github.io/construct/">Docs site</a> · <a href="https://github.com/thenewurbankid-web/construct">Source</a></p></li>
+        <li><h4>Vision</h4><p>A local-model pipeline that turns screenshots and specs into reusable Line components. Private code. <a href="https://thenewurbankid-web.github.io/construct/vision/">Status page</a></p></li>
+      </ul></li>
+  </ul>
+  <p class="mono list-foot"><a href="./" id="list-close">Open the star system</a></p>
+</nav>
+
+<noscript><style>#list{position:static;width:auto;height:auto;clip:auto;overflow:visible}</style></noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
