@@ -252,10 +252,14 @@ function restShot() {
 const occCam = new THREE.PerspectiveCamera(50, 1, 0.05, 30);
 const OCCLUDABLE = new Set(["orbit", "quest", "line", "construct", "vision", "ruckus", "crate"]);
 function screenRect(pts, cam) {
-  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, zs = 0;
-  for (const p of pts) { v3.copy(p).applyMatrix4(cam.matrixWorldInverse); zs += -v3.z; v3.applyMatrix4(cam.projectionMatrix);
-    x0 = Math.min(x0, v3.x); x1 = Math.max(x1, v3.x); y0 = Math.min(y0, v3.y); y1 = Math.max(y1, v3.y); }
-  return { x0, y0, x1, y1, z: zs / pts.length };
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, zs = 0, n = 0;
+  for (const p of pts) {
+    v3.copy(p).applyMatrix4(cam.matrixWorldInverse);
+    if (-v3.z < cam.near) continue;                       // behind the camera: cannot cover anything
+    zs += -v3.z; n++; v3.applyMatrix4(cam.projectionMatrix);
+    x0 = Math.min(x0, v3.x); x1 = Math.max(x1, v3.x); y0 = Math.min(y0, v3.y); y1 = Math.max(y1, v3.y);
+  }
+  return n ? { x0, y0, x1, y1, z: zs / n } : null;
 }
 // share of the object's on-screen box that the producer covers from this pose (0 = clear)
 function occlusion(id, pose, aspect = camera.aspect) {
@@ -263,7 +267,7 @@ function occlusion(id, pose, aspect = camera.aspect) {
   occCam.fov = pose.fov; occCam.aspect = aspect; occCam.updateProjectionMatrix();
   occCam.position.copy(pose.pos); occCam.lookAt(pose.look); occCam.updateMatrixWorld();
   const o = screenRect(room.corners(id), occCam), p = screenRect(room.corners("producer"), occCam);
-  if (p.z >= o.z) return 0;                                   // he is behind it
+  if (!o || !p || p.z >= o.z) return 0;                       // off camera, or he is behind it                                   // he is behind it
   const p0 = { x0: Math.max(-1, o.x0), x1: Math.min(1, o.x1), y0: Math.max(-1, o.y0), y1: Math.min(1, o.y1) };
   const area = Math.max(1e-6, (p0.x1 - p0.x0) * (p0.y1 - p0.y0));
   const ix = Math.max(0, Math.min(p0.x1, p.x1) - Math.max(p0.x0, p.x0)), iy = Math.max(0, Math.min(p0.y1, p.y1) - Math.max(p0.y0, p.y0));
