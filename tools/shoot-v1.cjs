@@ -1,5 +1,5 @@
 // usage: node shoot-v1.cjs <baseUrl> <prefix>
-const { chromium } = require('/Users/shashank/Repositories/construct/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 (async () => {
   const [base, prefix] = process.argv.slice(2);
   const b = await chromium.launch({ args: ['--use-gl=angle', '--ignore-gpu-blocklist'] });

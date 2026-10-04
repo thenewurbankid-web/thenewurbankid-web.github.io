@@ -1,5 +1,5 @@
 // usage: node qa/shoot-v2.cjs [base] [only]   screenshots of v2 at 375x812 and 1440x900 into qa/v2/
-const { chromium } = require('/Users/shashank/Repositories/construct/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const base = process.argv[2] || 'http://localhost:8792/';
 const only = process.argv[3] || '';
 const out = __dirname + '/../qa/v2/';
