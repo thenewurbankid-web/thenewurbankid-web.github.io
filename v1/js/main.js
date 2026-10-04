@@ -6,6 +6,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { WORLDS, MOONS, OWNER, byId } from "./data.js";
 import * as S from "./shaders.js";
+import { makeKeys, isTyping, trapTab } from "./keys.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -262,8 +263,9 @@ async function start() {
     const b = bodies.get(focus); const p = b.group.position;
     const pa = Math.atan2(p.z, p.x); // angle around the sun
     const k = b.id === "orbit" ? 8.2 : b.id === "line" ? 6.6 : 6.2;
-    const dist = b.r * k * (portrait ? 1.45 : 1);
-    return { target: p.clone(), az: pa + Math.PI - 1.2 + view.userAz * 0.5, el: THREE.MathUtils.clamp(0.2 + view.userEl * 0.5, -0.5, 0.9), dist, offR: wide ? 0.25 : 0.06, offU: wide ? 0 : -0.24, roll: 0 };
+    const dist = b.r * k * (portrait ? 1.45 : 1) * view.zoom;
+    const peeking = mode === "peek";   // keyboard focus: the world centred, no panel beside it
+    return { target: p.clone(), az: pa + Math.PI - 1.2 + view.userAz * 0.5, el: THREE.MathUtils.clamp(0.2 + view.userEl * 0.5, -0.5, 0.9), dist, offR: peeking ? 0 : wide ? 0.25 : 0.06, offU: peeking ? 0 : wide ? 0 : -0.24, roll: 0 };
   }
   function flyTo(mode, focus, dur = 2.4) {
     view.mode = mode; view.focus = focus; view.userAz = 0; view.userEl = 0; view.zoom = 1;
@@ -325,16 +327,18 @@ async function start() {
     const by = document.createElement("span"); by.className = "by"; by.setAttribute("aria-hidden", "true"); by.textContent = OWNER.person;
     title.appendChild(by);
   })();
-  hint.textContent = coarse ? "Swipe to orbit · tap a world" : "Drag to orbit · click a world · arrows and Enter";
+  hint.textContent = coarse ? "Swipe to orbit · tap a world" : "Drag to orbit · click a world · Tab, arrows · ? for keys";
 
   const labels = new Map();
   for (const d of [...WORLDS, ...MOONS]) {
     const a = document.createElement("a"); a.className = "lbl"; a.href = `#${d.id}`; a.textContent = d.name;
     a.addEventListener("click", (e) => { e.preventDefault(); openBody(d.id); });
+    a.addEventListener("focus", () => { if (a.matches(":focus-visible")) { peekAt(d.id); keys.announce(`${d.name}, ${d.parent ? "moon of " + byId(d.parent).name : "world"}. Enter to open.`); } });
     labelsEl.appendChild(a); labels.set(d.id, a);
   }
   const sunLbl = document.createElement("a"); sunLbl.className = "lbl"; sunLbl.href = "#about"; sunLbl.textContent = "The star";
   sunLbl.addEventListener("click", (e) => { e.preventDefault(); openAbout(); }); labelsEl.appendChild(sunLbl); labels.set("sun", sunLbl);
+  sunLbl.addEventListener("focus", () => { if (sunLbl.matches(":focus-visible")) { peekAt("sun"); keys.announce("The star: about The New Urban Kid. Enter to open."); } });
 
   const ICON = {
     Enter: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9 15l6-6M10 9h5v5"/></svg>',
@@ -385,11 +389,14 @@ async function start() {
     showPanel(d); selected = Math.max(0, order.indexOf(d.parent || id));
     title.classList.add("away"); hint.classList.remove("on");
     history.replaceState(null, "", `#${id}`);
+    keys.announce(`${d.name} open.`);
+    if (kbd) { panel.tabIndex = -1; requestAnimationFrame(() => panel.focus({ preventScroll: true })); }
   }
   function openAbout() {
     dismissIntro(); flyTo("about", null, 2.0); screenFade.target = 0;
     panel.classList.remove("in"); panel.hidden = true; about.hidden = false; requestAnimationFrame(() => requestAnimationFrame(() => about.classList.add("in")));
     title.classList.add("away"); history.replaceState(null, "", "#about");
+    if (kbd) { about.tabIndex = -1; requestAnimationFrame(() => about.focus({ preventScroll: true })); }
   }
   function back() {
     if (view.mode === "world") { const d = byId(view.focus); if (d.parent) return openBody(d.parent); }
@@ -399,13 +406,65 @@ async function start() {
   }
   $("p-back").addEventListener("click", (e) => { e.preventDefault(); back(); });
   $("about-back").addEventListener("click", (e) => { e.preventDefault(); back(); });
+  // ---------------------------------------------------------------- keyboard
+  const keys = makeKeys({
+    title: "Keys · the star system",
+    rows: [
+      ["Tab / Shift+Tab", "Move through the worlds, the moons and the star; the camera flies to each"],
+      ["Enter", "Open the focused world's panel"],
+      ["Esc", "Back out one level: panel, then world, then the whole system"],
+      ["[ / ]", "Previous or next world"],
+      ["← → ↑ ↓ or W A S D", "Orbit the camera (hold to keep moving)"],
+      ["+ / −", "Zoom in or out"],
+      ["0 or Home", "Recentre"],
+      ["?", "Show or hide this list"],
+    ],
+    enabled: () => !document.body.classList.contains("list"),
+  });
+  let kbd = false;
+  addEventListener("keydown", () => { kbd = true; }, true);
+  addEventListener("pointerdown", () => { kbd = false; }, true);
+  const orbitKeys = { vAz: 0, vEl: 0 };
+  function peekAt(id) {
+    if (id === "sun") { if (view.mode === "peek") { flyTo("system", null, 2.4); title.classList.remove("away"); } return; }
+    if (view.mode === "world" || view.mode === "about") return;
+    dismissIntro(); selected = Math.max(0, order.indexOf(byId(id).parent || id));
+    if (view.mode !== "peek" || view.focus !== id) flyTo("peek", id, view.mode === "peek" ? 2.2 : 2.6);
+  }
+  function focusLabel(id) { const el = labels.get(id); if (el) { el.tabIndex = 0; el.focus({ preventScroll: true }); } }
   addEventListener("keydown", (e) => {
-    if (document.body.classList.contains("list")) return;
-    if (e.key === "Escape") { back(); return; }
-    if (["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(e.key)) {
+    if (document.body.classList.contains("list") || isTyping(e) || keys.overlayOpen) return;
+    const panelOpen = !panel.hidden && panel.classList.contains("in"), aboutOpen = !about.hidden && about.classList.contains("in");
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (view.mode === "world" && !byId(view.focus).parent) {     // panel -> the world on its own
+        const id = view.focus; hidePanels(); screenFade.target = 0; flyTo("peek", id, 1.6); title.classList.remove("away");
+        history.replaceState(null, "", location.pathname + location.search); focusLabel(id); return;
+      }
+      if (view.mode === "world") { back(); requestAnimationFrame(() => panel.focus({ preventScroll: true })); return; }
+      const was = view.mode; back(); if (was === "about") focusLabel("sun");
+      return;
+    }
+    if (panelOpen && trapTab(panel, e)) return;
+    if (aboutOpen && trapTab(about, e)) return;
+    if (keys.isAxisKey(e)) {
       e.preventDefault(); dismissIntro();
-      selected = (selected + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : order.length - 1)) % order.length;
-      if (view.mode === "world") openBody(order[selected]);
+      if (reduced) {   // no continuous motion: one step per press
+        const rolled = cam.roll > 0.8, k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        const ax = k === "ArrowLeft" || k === "a" ? -1 : k === "ArrowRight" || k === "d" ? 1 : 0, ay = k === "ArrowUp" || k === "w" ? -1 : k === "ArrowDown" || k === "s" ? 1 : 0;
+        view.userAz += (rolled ? -ay : ax) * 0.3; view.userEl = THREE.MathUtils.clamp(view.userEl + (rolled ? ax : ay) * 0.22, -0.9, 0.9);
+      }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "+" || e.key === "=") { e.preventDefault(); dismissIntro(); view.zoom = THREE.MathUtils.clamp(view.zoom * 0.86, view.mode === "system" ? 0.45 : 0.6, 1.6); return; }
+    if (e.key === "-" || e.key === "_") { e.preventDefault(); dismissIntro(); view.zoom = THREE.MathUtils.clamp(view.zoom / 0.86, 0.45, view.mode === "system" ? 1.6 : 1.4); return; }
+    if (e.key === "0" || e.key === "Home") { e.preventDefault(); view.userAz = 0; view.userEl = 0; view.zoom = 1; return; }
+    if (e.key === "[" || e.key === "]") {
+      e.preventDefault(); dismissIntro();
+      const cur = Math.max(0, order.indexOf(view.focus ? (byId(view.focus)?.parent || view.focus) : order[selected]));
+      const next = order[(cur + (e.key === "]" ? 1 : order.length - 1)) % order.length];
+      if (view.mode === "world") openBody(next); else { focusLabel(next); peekAt(next); }
       return;
     }
     if (e.key === "Enter" && !(e.target instanceof HTMLAnchorElement) && !(e.target instanceof HTMLButtonElement)) {
@@ -536,11 +595,12 @@ async function start() {
   function placeLabels() {
     panelRect = panel.hidden ? null : panel.getBoundingClientRect();
     const showSys = view.mode === "system" && introDone;
-    const nearLine = view.mode === "world" && (view.focus === "line" || byId(view.focus)?.parent === "line");
+    const nearLine = (view.mode === "world" || view.mode === "peek") && (view.focus === "line" || byId(view.focus)?.parent === "line");
     const placed = [];
+    const active = document.activeElement;
     for (const [id, el] of labels) {
       const isMoon = id === "construct" || id === "vision";
-      let on = (showSys && !isMoon) || (nearLine && isMoon && id !== view.focus);
+      let on = (showSys && !isMoon) || (nearLine && isMoon && id !== view.focus) || (el === active && view.mode !== "world" && view.mode !== "about");
       if (on) {
         const obj = id === "sun" ? sun : bodies.get(id).group; const r = id === "sun" ? SUN_R : bodies.get(id).r;
         const s = screenOf(obj, r); on = s.front;
@@ -552,7 +612,8 @@ async function start() {
         placed.push({ el, x, y, w: el._w });
         if (isMoon && panelRect && x + el._w > panelRect.left && x < panelRect.right && y + 30 > panelRect.top && y < panelRect.bottom) on = false;
       }
-      el.classList.toggle("on", on); el.tabIndex = on ? 0 : -1;
+      el.classList.toggle("on", on);
+      el.tabIndex = view.mode === "world" || view.mode === "about" ? -1 : 0;   // panels keep Tab to themselves
       el.classList.toggle("sel", showSys && order[selected] === id);
       if (!on) { const i = placed.findIndex((p) => p.el === el); if (i >= 0) placed.splice(i, 1); }
     }
@@ -583,6 +644,15 @@ async function start() {
       if (b.group.userData.ring) b.group.userData.ring.material.uniforms.uCenter.value.copy(b.group.position);
     }
     sunMat.uniforms.uTime.value = time; starUniforms.uTime.value = time; screenMat.uniforms.uTime.value = time; post.uniforms.uTime.value = time;
+    if (!reduced) {
+      const ax = keys.axis(), rolled = cam.roll > 0.8, kv = 1 - Math.exp(-dt * 3.5);
+      const tAz = (rolled ? -ax.y : ax.x) * 0.95, tEl = (rolled ? ax.x : ax.y) * 0.62;
+      orbitKeys.vAz += (tAz - orbitKeys.vAz) * kv; orbitKeys.vEl += (tEl - orbitKeys.vEl) * kv;
+      if (Math.abs(orbitKeys.vAz) + Math.abs(orbitKeys.vEl) > 1e-4) {
+        if (ax.x || ax.y) dismissIntro();
+        view.userAz += orbitKeys.vAz * dt; view.userEl = THREE.MathUtils.clamp(view.userEl + orbitKeys.vEl * dt, -0.9, 0.9);
+      }
+    }
     updateCamera(dt);
     // sky follows the camera (mostly), near layers lag a little for real parallax, and tilt with the pointer
     nebula.position.copy(camera.position);
@@ -596,5 +666,5 @@ async function start() {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__tnuk = { get tier() { return tier; }, get dpr() { return dpr; }, gpu, openBody, back, openAbout, view };
+  window.__tnuk = { get tier() { return tier; }, get dpr() { return dpr; }, gpu, openBody, back, openAbout, view, cam };
 }

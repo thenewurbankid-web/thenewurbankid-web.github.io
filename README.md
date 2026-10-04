@@ -39,6 +39,33 @@ Opening `index.html` straight from disk will not work, because browsers block ES
 - `prefers-reduced-motion`: no parallax, no camera moves (the panel crossfades in), no spinning, the producer
   holds still, static grain.
 
+## Keyboard
+
+Both versions work with the keyboard alone. `?` shows the key list; the first Tab reaches a skip link to the plain
+list (v2: the crate; v1: `?list`). Focus is announced through a polite live region. Keys are ignored while typing.
+
+| v2 studio | |
+|---|---|
+| Tab / Shift+Tab | producer, Orbit (CRT), Quest (turntable), Ruckus (flyer), Line (MPC), Construct pad, Vision pad, crate, then v1, sound, tilt, keys; the camera glides to frame each |
+| Enter | open (push-in) |
+| Esc | back: panel or crate closes, focus returns to the object |
+| arrows / WASD | look around (hold; eased) |
+| + / − | step in / out |
+| 0 / Home | starting view |
+| crate | arrows flip, Enter turns the sleeve, Tab reaches its links |
+
+| v1 star system | |
+|---|---|
+| Tab / Shift+Tab | Orbit, Quest, Ruckus, Line, Construct, Vision, the star; the camera flies to each |
+| Enter | open the panel |
+| Esc | back one level: panel, then world, then the system |
+| [ / ] | previous / next world |
+| arrows / WASD | orbit the camera (hold; eased, the same as a drag) |
+| + / − | zoom |
+| 0 / Home | recentre |
+
+`tools/keyboard.cjs` runs the keyboard-only test in Playwright and writes `qa/keyboard/`.
+
 ## Files
 
 - `index.html`, `style.css`: the page, the panel, the crate and the corners

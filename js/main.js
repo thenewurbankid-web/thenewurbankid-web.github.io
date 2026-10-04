@@ -6,6 +6,7 @@ import { Film } from "./post.js";
 import { makeCanvases } from "./paper.js";
 import { makeCrate } from "./crate.js";
 import { makeSound } from "./sound.js";
+import { makeKeys, isTyping, trapTab } from "./keys.js";
 
 const $ = (id) => document.getElementById(id);
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -14,21 +15,40 @@ const phone = coarse || Math.min(screen.width, screen.height) < 820;
 const SET = phone ? "sm" : "lg";
 const body = document.body;
 
+// in Tab order: the producer, then the gear left to right through the projects, then the crate
 const SPOTS = {
   producer: { name: "Shashank Penumatcha", where: "At the desk" },
-  crate: { name: "The crate", where: "Every record, to flip through" },
-  line: { name: "Line framework", where: "The MPC" },
-  quest: { name: "A Vibe Called Quest", where: "On the turntable" },
   orbit: { name: "Orbit", where: "On the CRT" },
+  quest: { name: "A Vibe Called Quest", where: "On the turntable" },
   ruckus: { name: "Bring The Ruckus", where: "The flyer on the wall" },
+  line: { name: "Line framework", where: "The MPC" },
   construct: { name: "Construct", where: "A pad on the MPC" },
   vision: { name: "Vision", where: "A pad on the MPC" },
+  crate: { name: "The crate", where: "Every record, to flip through" },
 };
 const PAD_COLOR = { construct: "#ffc880", vision: "#5ad8ff", line: "#d8d0c4" };
 
 // ------------------------------------------------------------------ crate (works without WebGL too)
 let closeAll = () => {};
 const crate = makeCrate({ reduced, onClose: () => closeAll(true) });
+
+// ------------------------------------------------------------------ keyboard (overlay, held keys, announcements)
+const keys = makeKeys({
+  title: "Keys · the studio",
+  rows: [
+    ["Tab / Shift+Tab", "Move between the producer, the gear and the crate, then the corner links"],
+    ["Enter", "Open what has focus: the camera pushes in"],
+    ["Esc", "Back out: close the panel or the crate, focus returns to the gear"],
+    ["← → ↑ ↓ or W A S D", "Look around the room (hold to keep moving)"],
+    ["+ / −", "Step in or out"],
+    ["0 or Home", "Back to the starting view"],
+    ["In the crate", "← → flip records · Enter turns the sleeve · Tab reaches its links"],
+    ["?", "Show or hide this list"],
+  ],
+  enabled: () => !body.classList.contains("open") && !body.classList.contains("browse"),
+});
+$("keys-btn").addEventListener("click", (e) => { e.preventDefault(); keys.toggle(); });
+$("skip").addEventListener("click", (e) => { e.preventDefault(); if (typeof navigate === "function" && window.__studio) navigate("crate"); else crate.open(); });
 
 // ------------------------------------------------------------------ renderer
 let renderer;
@@ -78,12 +98,17 @@ for (const id of Object.keys(SPOTS)) {
   a.innerHTML = `<span>${SPOTS[id].name}</span>`;
   a.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") setHover(id); });
   a.addEventListener("pointerleave", () => setHover(null));
-  a.addEventListener("focus", () => setHover(id));
-  a.addEventListener("blur", () => setHover(null));
+  a.addEventListener("focus", () => {
+    setHover(id);
+    if (a.matches(":focus-visible")) peek.id = id;          // keyboard focus: the camera glides to frame it
+    keys.announce(`${SPOTS[id].name}. ${SPOTS[id].where}. Enter to open.`);
+  });
+  a.addEventListener("blur", () => { setHover(null); if (peek.id === id) peek.id = null; });
   a.addEventListener("click", (e) => { e.preventDefault(); navigate(id); });
   hotsEl.appendChild(a); hots[id] = a;
 }
 const state = { hover: null, open: null };
+const peek = { id: null };
 function setHover(id) {
   state.hover = id;
   if (id && !state.open) {
@@ -171,15 +196,25 @@ const camState = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 50 
 const shot = { from: null, to: null, t: 1, dur: 2.1 };
 const focus = { dist: 2.6, aperture: 0.9, blurAll: 0 };
 const par = { x: 0, y: 0, tx: 0, ty: 0 };
+// keyboard look: x/y in -1..1 (pan and look), dolly in metres along the view; eased toward targets
+const look = { x: 0, y: 0, vx: 0, vy: 0, dolly: 0, tdolly: 0 };
 let lastFocus = null;
 
+const pc = new THREE.Vector3();
 function restShot() {
-  const fwd = v3.copy(rig.look).sub(rig.pos).normalize();
+  const fwd = rig.look.clone().sub(rig.pos).normalize();
   const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
   const up = new THREE.Vector3().crossVectors(right, fwd);
-  const pos = rig.pos.clone().addScaledVector(right, par.x * 0.085).addScaledVector(up, -par.y * 0.05);
+  const pos = rig.pos.clone().addScaledVector(right, par.x * 0.085 + look.x * 0.2).addScaledVector(up, -par.y * 0.05 - look.y * 0.1)
+    .addScaledVector(fwd, look.dolly);
   if (!reduced) pos.x += Math.sin(clock.elapsedTime * 0.11) * 0.008, pos.y += Math.sin(clock.elapsedTime * 0.07) * 0.005;
-  return { pos, look: rig.look.clone(), fov: rig.fov };
+  const aim = rig.look.clone().addScaledVector(right, look.x * 0.45).addScaledVector(up, -look.y * 0.28);
+  let fov = rig.fov;
+  if (peek.id && !state.open) {                 // frame the focused object without pushing all the way in
+    room.center(peek.id, pc);
+    aim.lerp(pc, 0.5); pos.lerp(pc, 0.16); fov *= 0.9;
+  }
+  return { pos, look: aim, fov };
 }
 function objectShot(id) {
   const c = room.center(id, new THREE.Vector3());
@@ -246,6 +281,7 @@ function close() {
   setTimeout(() => { if (!state.open) panel.hidden = true; }, reduced ? 0 : 900);
   if (was === "crate") crate.close();
   startShot(null, 2.2);
+  announceRoom();
   if (lastFocus && document.activeElement && (panel.contains(document.activeElement) || $("crate").contains(document.activeElement) || document.activeElement === panel)) lastFocus.focus({ preventScroll: true });
 }
 closeAll = () => back();
@@ -265,7 +301,24 @@ addEventListener("popstate", () => {
   const id = location.hash.slice(1);
   if (id && (byId(id) || id === "crate" || id === "producer")) open(id); else close();
 });
-addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); back(); } });
+addEventListener("keydown", (e) => {
+  if (isTyping(e) || keys.overlayOpen) return;
+  if (e.key === "Escape") { e.preventDefault(); back(); return; }
+  if (state.open === "crate") { trapTab($("crate"), e); return; }
+  if (state.open) { trapTab(panel, e); return; }
+  if (keys.isAxisKey(e)) {
+    e.preventDefault();
+    if (reduced) { const a = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key] || { a: [-1, 0], d: [1, 0], w: [0, -1], s: [0, 1] }[e.key.toLowerCase()];
+      look.x = THREE.MathUtils.clamp(look.x + a[0] * 0.34, -1, 1); look.y = THREE.MathUtils.clamp(look.y + a[1] * 0.34, -1, 1); }
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "+" || e.key === "=") { e.preventDefault(); look.tdolly = Math.min(0.7, look.tdolly + 0.18); }
+  else if (e.key === "-" || e.key === "_") { e.preventDefault(); look.tdolly = Math.max(-0.45, look.tdolly - 0.18); }
+  else if (e.key === "0" || e.key === "Home") { e.preventDefault(); look.x = reduced ? 0 : look.x; look.y = reduced ? 0 : look.y; look.home = true; look.tdolly = 0; }
+});
+// the room announces itself when you come back to it
+const announceRoom = () => keys.announce("Back in the studio.");
 $("scene").addEventListener("click", () => { if (state.open) back(); });
 
 // ------------------------------------------------------------------ parallax: mouse, or tilt on phones
@@ -325,6 +378,14 @@ function frame() {
   // parallax eases toward the pointer or tilt
   const k = 1 - Math.exp(-dt * 2.0);
   par.x += (par.tx - par.x) * k; par.y += (par.ty - par.y) * k;
+  // keyboard look: held keys drive a velocity that eases in and out, so moves start and stop softly
+  if (!state.open && !reduced) {
+    const ax = keys.axis(), kv = 1 - Math.exp(-dt * 3.5);
+    look.vx += (ax.x * 0.75 - look.vx) * kv; look.vy += (ax.y * 0.75 - look.vy) * kv;
+    look.x = THREE.MathUtils.clamp(look.x + look.vx * dt, -1, 1); look.y = THREE.MathUtils.clamp(look.y + look.vy * dt, -1, 1);
+    if (look.home) { const kh = 1 - Math.exp(-dt * 2.5); look.x -= look.x * kh; look.y -= look.y * kh; if (Math.abs(look.x) + Math.abs(look.y) < 0.002) { look.x = look.y = 0; look.home = false; } if (ax.x || ax.y) look.home = false; }
+  } else if (reduced && look.home) { look.home = false; }
+  look.dolly += (look.tdolly - look.dolly) * (reduced ? 1 : 1 - Math.exp(-dt * 2.2));
   // camera
   if (shot.t < 1) {
     shot.t = Math.min(1, shot.t + dt / shot.dur);
@@ -334,7 +395,7 @@ function frame() {
     camState.fov = THREE.MathUtils.lerp(shot.from.fov, to.fov, e);
     focus.blurAll = reduced ? 0 : Math.sin(Math.PI * e) * 2.2 * dpr;
   } else if (!state.open) {
-    const r = restShot(), kk = 1 - Math.exp(-dt * 1.1);
+    const r = restShot(), kk = reduced ? 1 : 1 - Math.exp(-dt * 1.1);
     camState.pos.lerp(r.pos, kk); camState.look.lerp(r.look, kk); camState.fov += (r.fov - camState.fov) * kk;
     focus.blurAll = 0;
   }
@@ -364,7 +425,7 @@ requestAnimationFrame(frame);
 // ------------------------------------------------------------------ start
 requestAnimationFrame(() => $("veil").classList.add("off"));
 const hint = $("hint");
-hint.textContent = coarse ? "Tilt to look · tap the gear" : "Move to look · click the gear · Tab works too";
+hint.textContent = coarse ? "Tilt to look · tap the gear" : "Move to look · click the gear · Tab, arrows · ? for keys";
 setTimeout(() => hint.classList.add("on"), reduced ? 300 : 3200);
 setTimeout(() => hint.classList.remove("on"), 11000);
 const start = location.hash.slice(1);
@@ -372,4 +433,4 @@ if (start && (byId(start) || start === "crate" || start === "producer")) {
   history.replaceState(null, "", location.pathname + location.search); history.pushState({ id: start }, "", `#${start}`);
   setTimeout(() => open(start), reduced ? 0 : 900);
 }
-window.__studio = { state, open: navigate, back, camState };
+window.__studio = { state, open: navigate, back, camState, look, peek };
