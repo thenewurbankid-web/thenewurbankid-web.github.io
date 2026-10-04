@@ -6,6 +6,15 @@ The portfolio of The New Urban Kid, Shashank Penumatcha.
 photos on planes and simple boxes at real depths in one WebGL scene (three.js 0.170.0 from jsDelivr), lit only by
 the practical lights: the desk lamp, the glow of the CRT, the MPC pads and two red LEDs. At the centre, the producer
 sits at the desk in a black snapback, seen from behind, still apart from a slow breath while the MPC pads pulse. Focus or tap them for **About**: Shashank Penumatcha, The New Urban Kid, what the projects are, and GitHub.
+On the desk beside him is a cassette: **"The New Urban Kid (freestyle)"** by Shashank Raju, beat by El-P. Tap it (or Tab to
+it and press Enter) and the camera pushes in on the tape, tracks to the boombox as the tape goes in, holds while play
+goes down, then pulls back to the room on the first strong beat. While it plays, an AnalyserNode drives the room: the
+boombox cones pump with the bass, the MPC pads and the lamp pulse on the beat, and the CRT shows the waveform. The
+camera drifts with the bars and leans toward the speakers in the loudest part; any mouse, tilt or key input takes it
+back, and the drift resumes after a few idle seconds. Pause, stop and volume sit under the player (Space toggles while
+the tape or the player has focus); "sound" mutes it. The audio is fetched only on that tap. With reduced motion the
+shots crossfade and only the lights pulse.
+
 Each piece of gear is a project:
 
 - **Orbit**: the CRT, glowing with the Orbit space scene
@@ -46,7 +55,8 @@ list (v2: the crate; v1: `?list`). Focus is announced through a polite live regi
 
 | v2 studio | |
 |---|---|
-| Tab / Shift+Tab | producer, Orbit (CRT), Quest (turntable), Ruckus (flyer), Line (MPC), Construct pad, Vision pad, crate, then v1, sound, tilt, keys; the camera glides to frame each |
+| Tab / Shift+Tab | producer, Orbit (CRT), Quest (turntable), Ruckus (flyer), Line (MPC), Construct pad, Vision pad, the cassette, crate, then v1, sound, tilt, keys, GitHub, LinkedIn; the camera glides to frame each |
+| Space | pause or resume the tape (cassette or player focused) |
 | Enter | open (push-in) |
 | Esc | back: panel or crate closes, focus returns to the object |
 | arrows / WASD | look around (hold; eased) |
@@ -74,6 +84,10 @@ list (v2: the crate; v1: `?list`). Focus is announced through a polite live regi
 - `js/post.js`: the film look: depth of field, bloom with a warm halation, grade, grain, vignette, light leak
 - `js/paper.js`: the cork board polaroids, the credit card, the flyer and the record label, drawn in Jost
 - `js/crate.js`, `js/sound.js`, `js/main.js`: the crate, the optional sound, camera and interaction
+- `js/song.js`: the song: lazy audio, beat and energy analysis, the camera choreography and the player controls
+- `js/keys.js`: the key list, held keys and screen-reader announcements (v1 has its own copy)
+- `assets/audio/`: the song's web copies
+- `tools/build_song_assets.py`: the boombox and cassette textures; `tools/song.cjs`, `tools/occlusion.cjs`: Playwright checks
 - `assets/room/{lg,sm}/`: textures for desktops and phones (phones load `sm`, at most 1024 px)
 - `assets/CREDITS.md`: source, author, licence and edits for every photo and texture
 - `tools/build_assets.py`: makes `assets/room/` from the source photos (Pillow, numpy, scipy)

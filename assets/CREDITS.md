@@ -16,10 +16,19 @@ Licences were checked on each file's Wikimedia Commons or ambientCG page on 2026
 | `crate.webp` | Records in a crate | [Vinyl collection at a record store (Unsplash)](https://commons.wikimedia.org/wiki/File:Vinyl_collection_at_a_record_store_(Unsplash).jpg) | Fabien Barral (Mr Cup) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Cropped away the shop signs, resized, WebP |
 | `gloves.webp` | Boxing gloves on the Bring The Ruckus flyer | [Black boxing gloves](https://commons.wikimedia.org/wiki/File:Black_boxing_gloves.jpg) | Airman 1st Class Kerelin Molina, U.S. Air Force | Public domain (work of the U.S. federal government) | Greyscale, contrast, resized, WebP |
 | `producer.webp` | The producer at the desk, seen from behind | [Back View of Black Man in Baseball Hat and T-Shirt](https://www.pexels.com/photo/back-view-of-black-man-in-baseball-hat-and-t-shirt-18708554/) (Pexels 18708554) | Mustapha Damilola | [Pexels licence](https://www.pexels.com/license/) (free use and modification; credit not required, given anyway) | White script on the cap and the logo on the back of the shirt painted out to plain black with the fabric texture kept; gold chain glare toned down; cut out with rembg (isnet-general-use, alpha matting); edge colour pulled in from the interior to remove the light-wall fringe; cropped, resized, WebP. Relit in the browser (warm lamp key, thin cool CRT rim, falloff); only a slow breath, no head motion. Skin tone not altered. Source kept out of git in `assets/src/`; `tools/build_producer.py` |
+| `boombox.webp` | The boombox (the song plays here) | [Philips D8444 (1)](https://commons.wikimedia.org/wiki/File:Philips_D8444_(1).jpg) | Retired electrician | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Maker's name and the "Metal" badge blurred, maker's mark on the centre dome blurred, the tape's own label inside the door blurred; yellow backdrop removed (alpha); resized, WebP. In the browser: the cones pump with the bass, the door darkens until the tape goes in, the play key goes down. `tools/build_song_assets.py` |
+| `cassette.webp` | The tape on the desk | [Namroud Gorguis 2017 (Unsplash)](https://commons.wikimedia.org/wiki/File:Namroud_Gorguis_2017_(Unsplash).jpg) | Namroud Gorguis | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Cut out (alpha), resized, WebP. The blank label is written on in the browser in Jost: the song title, artist and beat credit. `tools/build_song_assets.py` |
 | `wall.webp` | Wall plaster | [Plaster001](https://ambientcg.com/view?id=Plaster001) | ambientCG | [CC0 1.0](https://docs.ambientcg.com/license/) | Colour map only, resized, WebP; tinted dark in the shader |
 | `desk.webp` | Desk wood (also the plinth, cables and speaker sides, tinted) | [Wood051](https://ambientcg.com/view?id=Wood051) | ambientCG | [CC0 1.0](https://docs.ambientcg.com/license/) | Colour map only, resized, WebP |
 | `cork.webp` | Cork board | [Cork002](https://ambientcg.com/view?id=Cork002) | ambientCG | [CC0 1.0](https://docs.ambientcg.com/license/) | Colour map only, resized, WebP |
 | `paper.webp` | Paper for the polaroids and the card | [Paper001](https://ambientcg.com/view?id=Paper001) | ambientCG | [CC0 1.0](https://docs.ambientcg.com/license/) | Colour map only, resized, WebP |
+
+## The song
+
+- `assets/audio/song.mp3` (160 kbps) and `assets/audio/song.webm` (Opus, 128 kbps): **"The New Urban Kid (freestyle)"** by
+  **Shashank Raju**, **beat by El-P**. Encoded from the owner's file `assets/src/song.mp3`, metadata stripped.
+  Published by the owner with the beat credit, as a short non-commercial clip. The credit shows on the cassette label,
+  under the player while it plays, and in the About panel.
 
 Not photos from outside:
 

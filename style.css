@@ -224,3 +224,25 @@ body.open #toggles, body.browse #toggles { opacity: .5; }
 #social a:focus-visible { outline: 1px solid rgba(255,255,255,.6); outline-offset: 4px; }
 @media (max-width: 899px) { #social { display: none; } }
 body.open #social, body.browse #social { opacity: .4; }
+/* ---- the song: controls, and the room stepping back during the opening shots ---- */
+body.song-intro .hot:not([href="#cassette"]) { visibility: hidden; pointer-events: none; }
+body.song-intro #hint, body.song-intro #tag { opacity: 0; }
+#song-ui {
+  position: fixed; left: var(--pad); bottom: var(--bot); z-index: 5; margin: 0; max-width: min(520px, calc(100vw - 2 * var(--pad) - 150px));
+  opacity: 0; transform: translateY(8px); transition: opacity 1.2s ease, transform 1.4s var(--slow);
+}
+#song-ui.in { opacity: 1; transform: none; }
+#song-ui p { margin: 0; }
+#song-ui .now { font: 300 13px/1.35 var(--thin); color: var(--ink); text-shadow: 0 0 10px #000; }
+#song-ui .now .a { display: block; font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+#song-ui .ctl { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--faint); }
+#song-ui .ctl a { color: var(--dim); text-decoration: none; padding: 6px 0; }
+#song-ui .ctl a:hover, #song-ui .ctl a:focus-visible { color: #fff; }
+#song-ui .ctl a:focus-visible, #song-ui input:focus-visible { outline: 1px solid rgba(255,255,255,.6); outline-offset: 4px; }
+#song-ui label { display: inline-flex; align-items: center; gap: 8px; }
+#song-ui input[type=range] { width: 84px; accent-color: #e9e2d6; height: 2px; }
+@media (max-width: 560px) {
+  #song-ui { max-width: calc(100vw - 2 * var(--pad)); bottom: calc(var(--bot) + 30px); }
+}
+body.open #song-ui { opacity: .25; }
+body.song-on .hot[href="#cassette"]:focus-visible { box-shadow: none; }

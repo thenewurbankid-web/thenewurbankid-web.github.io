@@ -3,7 +3,8 @@ import * as THREE from "three";
 import { byId, OWNER, WORLDS } from "./data.js";
 import { buildRoom } from "./room.js";
 import { Film } from "./post.js";
-import { makeCanvases } from "./paper.js";
+import { makeCanvases, SONG } from "./paper.js";
+import { makeSong } from "./song.js";
 import { makeCrate } from "./crate.js";
 import { makeSound } from "./sound.js";
 import { makeKeys, isTyping, trapTab } from "./keys.js";
@@ -24,6 +25,7 @@ const SPOTS = {
   line: { name: "Line framework", where: "The MPC" },
   construct: { name: "Construct", where: "A pad on the MPC" },
   vision: { name: "Vision", where: "A pad on the MPC" },
+  cassette: { name: SONG.title, where: "A tape on the desk" },
   crate: { name: "The crate", where: "Every record, to flip through" },
 };
 const PAD_COLOR = { construct: "#ffc880", vision: "#5ad8ff", line: "#d8d0c4" };
@@ -43,6 +45,7 @@ const keys = makeKeys({
     ["+ / −", "Step in or out"],
     ["0 or Home", "Back to the starting view"],
     ["In the crate", "← → flip records · Enter turns the sleeve · Tab reaches its links"],
+    ["Space", "Pause or resume the tape (with the cassette or the player focused)"],
     ["?", "Show or hide this list"],
   ],
   enabled: () => !body.classList.contains("open") && !body.classList.contains("browse"),
@@ -71,17 +74,17 @@ const film = new Film(renderer, { phone });
 // ------------------------------------------------------------------ assets
 const loader = new THREE.TextureLoader();
 const load = (path, srgb = true) => loader.loadAsync(path).then((t) => { if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t; });
-const names = ["wall", "desk", "cork", "paper", "crt", "mpc", "record", "speaker", "lamp", "window", "crate", "gloves", "producer"];
+const names = ["wall", "desk", "cork", "paper", "crt", "mpc", "record", "speaker", "lamp", "window", "crate", "gloves", "producer", "boombox", "cassette"];
 const [meta, ...texList] = await Promise.all([
   fetch("assets/room/meta.json").then((r) => r.json()),
   ...names.map((n) => load(`assets/room/${SET}/${n}.webp`)),
   ...["orbit", "quest", "ruckus", "construct"].map((n) => load(`assets/previews/${n}.webp`)),
 ]);
 const tex = Object.fromEntries(names.map((n, i) => [n, texList[i]]));
-const prev = { orbit: texList[13], quest: texList[14], ruckus: texList[15], construct: texList[16] };
+const N = names.length, prev = { orbit: texList[N], quest: texList[N + 1], ruckus: texList[N + 2], construct: texList[N + 3] };
 tex.orbit = prev.orbit;
 const canvases = await makeCanvases({
-  cork: tex.cork.image, paper: tex.paper.image, gloves: tex.gloves.image,
+  cork: tex.cork.image, paper: tex.paper.image, gloves: tex.gloves.image, cassette: tex.cassette.image, cassetteMeta: meta.cassette,
   previews: Object.fromEntries(Object.entries(prev).map(([k, t]) => [k, t.image])),
 });
 const room = await buildRoom({ tex, meta, canvases, reduced });
@@ -95,7 +98,7 @@ for (const id of Object.keys(SPOTS)) {
   a.className = "hot" + (id === "construct" || id === "vision" ? " pad" : "");
   a.href = `#${id}`;
   const d = byId(id);
-  a.setAttribute("aria-label", id === "crate" ? "The crate of records: browse every project" : id === "producer" ? "About Shashank Penumatcha" : `${d.name}, ${SPOTS[id].where.toLowerCase()}: ${d.pitch}`);
+  a.setAttribute("aria-label", id === "cassette" ? `Play ${SONG.title} by ${SONG.artist}` : id === "crate" ? "The crate of records: browse every project" : id === "producer" ? "About Shashank Penumatcha" : `${d.name}, ${SPOTS[id].where.toLowerCase()}: ${d.pitch}`);
   a.innerHTML = `<span>${SPOTS[id].name}</span>`;
   a.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") setHover(id); });
   a.addEventListener("pointerleave", () => setHover(null));
@@ -105,7 +108,7 @@ for (const id of Object.keys(SPOTS)) {
     keys.announce(`${SPOTS[id].name}. ${SPOTS[id].where}. Enter to open.`);
   });
   a.addEventListener("blur", () => { setHover(null); if (peek.id === id) peek.id = null; });
-  a.addEventListener("click", (e) => { e.preventDefault(); navigate(id); });
+  a.addEventListener("click", (e) => { e.preventDefault(); if (id === "cassette") return song.start(); navigate(id); });
   hotsEl.appendChild(a); hots[id] = a;
 }
 const state = { hover: null, open: null };
@@ -131,7 +134,7 @@ function prodRect(W, H) {
 function placeHots() {
   const W = innerWidth, H = innerHeight;
   for (const [id, a] of Object.entries(hots)) {
-    const pts = room.corners(id);
+    const pts = room.corners(id === "cassette" && song.active ? "boombox" : id);
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const p of pts) {
       v3.copy(p).project(camera);
@@ -160,7 +163,8 @@ function fillAbout() {
   $("p-kicker").textContent = "At the desk";
   $("p-name").textContent = OWNER.person;
   $("p-pitch").textContent = `${OWNER.name}. ${OWNER.line}`;
-  $("p-facts").replaceChildren(Object.assign(document.createElement("li"), { textContent: OWNER.summary }));
+  $("p-facts").replaceChildren(Object.assign(document.createElement("li"), { textContent: OWNER.summary }),
+    Object.assign(document.createElement("li"), { textContent: `On the tape: “${SONG.title}” by ${SONG.artist}, ${SONG.credit}.` }));
   $("p-tags").textContent = "";
   const pads = $("p-pads"); pads.replaceChildren();
   for (const w of WORLDS) {
@@ -250,7 +254,7 @@ function restShot() {
 }
 // ---- occlusion: the producer sits between the room camera and the desk, so every framing is checked against him
 const occCam = new THREE.PerspectiveCamera(50, 1, 0.05, 30);
-const OCCLUDABLE = new Set(["orbit", "quest", "line", "construct", "vision", "ruckus", "crate"]);
+const OCCLUDABLE = new Set(["orbit", "quest", "line", "construct", "vision", "ruckus", "crate", "cassette", "boombox"]);
 function screenRect(pts, cam) {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, zs = 0, n = 0;
   for (const p of pts) {
@@ -377,11 +381,12 @@ addEventListener("popstate", () => {
 });
 addEventListener("keydown", (e) => {
   if (isTyping(e) || keys.overlayOpen) return;
-  if (e.key === "Escape") { e.preventDefault(); back(); return; }
+  if (e.key === "Escape") { e.preventDefault(); if (song.intro && !state.open) { song.stop(); return; } back(); return; }
+  if (e.key === " " && song.active && (document.activeElement === hots.cassette || $("song-ui").contains(document.activeElement))) { e.preventDefault(); song.toggle(); return; }
   if (state.open === "crate") { trapTab($("crate"), e); return; }
   if (state.open) { trapTab(panel, e); return; }
   if (keys.isAxisKey(e)) {
-    e.preventDefault();
+    e.preventDefault(); song.poke(clock.elapsedTime);
     if (reduced) { const a = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key] || { a: [-1, 0], d: [1, 0], w: [0, -1], s: [0, 1] }[e.key.toLowerCase()];
       look.x = THREE.MathUtils.clamp(look.x + a[0] * 0.34, -1, 1); look.y = THREE.MathUtils.clamp(look.y + a[1] * 0.34, -1, 1); }
     return;
@@ -396,7 +401,7 @@ const announceRoom = () => keys.announce("Back in the studio.");
 $("scene").addEventListener("click", () => { if (state.open) back(); });
 
 // ------------------------------------------------------------------ parallax: mouse, or tilt on phones
-addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" && !reduced) { par.tx = (e.clientX / innerWidth) * 2 - 1; par.ty = (e.clientY / innerHeight) * 2 - 1; } });
+addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") song.poke(clock.elapsedTime); if (e.pointerType === "mouse" && !reduced) { par.tx = (e.clientX / innerWidth) * 2 - 1; par.ty = (e.clientY / innerHeight) * 2 - 1; } });
 const tiltBtn = $("tilt");
 let tilt0 = null, tiltOn = false;
 function onTilt(e) {
@@ -404,6 +409,7 @@ function onTilt(e) {
   if (!tilt0) tilt0 = { g: e.gamma, b: e.beta };
   const c = (v) => Math.max(-1, Math.min(1, v));
   par.tx = c((e.gamma - tilt0.g) / 22); par.ty = c((e.beta - tilt0.b) / 22);
+  if (Math.abs(par.tx - par.x) + Math.abs(par.ty - par.y) > 0.06) song.poke(clock.elapsedTime);
 }
 function setTilt(on) {
   tiltOn = on; tilt0 = null;
@@ -424,9 +430,27 @@ if (coarse && !reduced && "DeviceOrientationEvent" in window) {
 
 // ------------------------------------------------------------------ sound
 const sound = makeSound();
+let songMuted = false;
+const soundLabel = (on) => { $("sound").textContent = on ? "sound on" : "sound off"; $("sound").setAttribute("aria-pressed", String(on)); };
 $("sound").addEventListener("click", (e) => {
-  e.preventDefault(); const on = sound.toggle();
-  e.currentTarget.textContent = on ? "sound on" : "sound off"; e.currentTarget.setAttribute("aria-pressed", String(on));
+  e.preventDefault();
+  if (song.active) { songMuted = !songMuted; song.setMuted(songMuted); return soundLabel(!songMuted); }   // while the tape plays, this is its mute
+  soundLabel(sound.toggle());
+});
+
+// ------------------------------------------------------------------ the song on the tape
+const song = makeSong({
+  room, rig, reduced, camera, getRest: () => restShot(),
+  onChange(what) {
+    const a = hots.cassette;
+    body.classList.toggle("song-on", what !== "idle");
+    if (what === "start") { songMuted = false; song.setMuted(false); soundLabel(true); sound.duck(true); hint.classList.remove("on"); tagEl.classList.remove("on");
+      keys.announce(`Playing ${SONG.title} by ${SONG.artist}, ${SONG.credit}.`); }
+    if (what === "play" || what === "groove") a.setAttribute("aria-label", `Pause ${SONG.title}`);
+    if (what === "pause") { a.setAttribute("aria-label", `Resume ${SONG.title}`); keys.announce("Paused."); }
+    if (what === "end") { keys.announce("The tape stopped."); }
+    if (what === "idle") { a.setAttribute("aria-label", `Play ${SONG.title} by ${SONG.artist}`); sound.duck(false); soundLabel(sound.on); }
+  },
 });
 
 // ------------------------------------------------------------------ size
@@ -461,6 +485,8 @@ function frame() {
     if (look.home) { const kh = 1 - Math.exp(-dt * 2.5); look.x -= look.x * kh; look.y -= look.y * kh; if (Math.abs(look.x) + Math.abs(look.y) < 0.002) { look.x = look.y = 0; look.home = false; } if (ax.x || ax.y) look.home = false; }
   } else if (reduced && look.home) { look.home = false; }
   look.dolly += (look.tdolly - look.dolly) * (reduced ? 1 : 1 - Math.exp(-dt * 2.2));
+  // the song's director takes the camera while the tape plays (and hands it back on any input)
+  const ds = !state.open && shot.t >= 1 ? song.director(dt, t) : (song.director(dt, t), null);
   // camera
   if (shot.t < 1) {
     shot.t = Math.min(1, shot.t + dt / shot.dur);
@@ -469,6 +495,9 @@ function frame() {
     camState.look.lerpVectors(shot.from.look, to.look, e);
     camState.fov = THREE.MathUtils.lerp(shot.from.fov, to.fov, e);
     focus.blurAll = reduced ? 0 : Math.sin(Math.PI * e) * 2.2 * dpr;
+  } else if (ds) {
+    camState.pos.lerp(ds.pos, ds.k); camState.look.lerp(ds.look, ds.k); camState.fov += (ds.fov - camState.fov) * ds.k;
+    focus.blurAll = (ds.blurAll || 0) * dpr;
   } else if (!state.open) {
     const r = restShot(), kk = reduced ? 1 : 1 - Math.exp(-dt * 1.1);
     camState.pos.lerp(r.pos, kk); camState.look.lerp(r.look, kk); camState.fov += (r.fov - camState.fov) * kk;
@@ -478,16 +507,18 @@ function frame() {
   if (Math.abs(camera.fov - camState.fov) > 1e-4) { camera.fov = camState.fov; camera.updateProjectionMatrix(); }
   // depth of field: rest focus on the CRT, push-in focus on the object
   const restFocus = camera.position.distanceTo(room.center("orbit", v3)) * 0.74;
-  const wantDist = focus.target ?? restFocus;
-  const wantAp = state.open ? (state.open === "crate" ? 3.5 : 2.4) : (camera.aspect < 1 ? 0.55 : 0.8);
+  const wantDist = ds?.focus ?? focus.target ?? restFocus;
+  const wantAp = ds?.aperture != null ? ds.aperture : state.open ? (state.open === "crate" ? 3.5 : 2.4) : (camera.aspect < 1 ? 0.55 : 0.8);
   const kf = 1 - Math.exp(-dt * 2.4);
   focus.dist += (wantDist - focus.dist) * kf; focus.aperture += (wantAp - focus.aperture) * kf;
+  film.u.uFade.value = ds?.fade ?? 1;
   film.u.uFocus.value = focus.dist; film.u.uAperture.value = focus.aperture; film.u.uBlurAll.value = focus.blurAll;
   film.u.uTime.value = reduced ? 0 : t;
   film.u.uLeak.value = reduced ? 0.03 : 0.045 + 0.02 * Math.sin(t * 0.21);
   room.update(dt, t, state);
   {
-    const target = state.open && state.open !== "producer" ? (state.open === "construct" || state.open === "vision" ? "line" : state.open) : peek.id;
+    const songShot = song.active && (song.phase === "intro" || song.phase === "pull") ? (room.song.cas.visible ? "cassette" : "boombox") : null;
+    const target = state.open && state.open !== "producer" ? (state.open === "construct" || state.open === "vision" ? "line" : state.open) : songShot || peek.id;
     const pose = { pos: camera.position, look: camState.look, fov: camera.fov };
     const covered = target && target !== "producer" && occlusion(target, pose) > 0.02;
     const want = covered || (state.open && OCCLUDABLE.has(state.open)) ? 0.2 : 1;
@@ -516,4 +547,4 @@ if (start && (byId(start) || start === "crate" || start === "producer")) {
   history.replaceState(null, "", location.pathname + location.search); history.pushState({ id: start }, "", `#${start}`);
   setTimeout(() => open(start), reduced ? 0 : 900);
 }
-window.__studio = { state, open: navigate, back, camState, look, peek, occlusion: (id) => occlusion(state.open && (id === "construct" || id === "vision") ? "line" : id, { pos: camera.position.clone(), look: camState.look.clone(), fov: camera.fov }), get producerFade() { return prodFade; } };
+window.__studio = { state, open: navigate, back, camState, look, peek, occlusion: (id) => occlusion(state.open && (id === "construct" || id === "vision") ? "line" : id, { pos: camera.position.clone(), look: camState.look.clone(), fov: camera.fov }), get producerFade() { return prodFade; }, song };

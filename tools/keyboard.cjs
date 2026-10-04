@@ -22,7 +22,7 @@ async function v2(b, w, h, mobile) {
   await p.keyboard.press("Tab"); await wait(p, 400);
   ok((await active()) === "skip", `v2 ${w}: first Tab reaches the skip link`);
   await p.screenshot({ path: `${out}v2-${w}-skip.png` });
-  const tour = ["producer", "orbit", "quest", "ruckus", "line", "construct", "vision", "crate"];
+  const tour = ["producer", "orbit", "quest", "ruckus", "line", "construct", "vision", "cassette", "crate"];
   for (const id of tour) {
     await p.keyboard.press("Tab"); await wait(p, 2200);
     const href = await p.evaluate(() => document.activeElement.getAttribute("href"));

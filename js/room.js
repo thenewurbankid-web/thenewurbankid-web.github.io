@@ -37,7 +37,7 @@ void main() {
 
 // CRT glass: the Orbit preview, bent and scanned, glowing
 const SCREEN_FRAG = /* glsl */ `
-uniform sampler2D map; uniform float uTime, uHover, uPower;
+uniform sampler2D map, uWave; uniform float uTime, uHover, uPower, uWaveMix;
 varying vec2 vUv;
 void main() {
   vec2 uv = vUv * 2.0 - 1.0;
@@ -50,6 +50,14 @@ void main() {
   col.g = texture2D(map, s).g;
   col.b = texture2D(map, s - vec2(0.0012, 0.0)).b;
   col = pow(col, vec3(0.9)) * 1.4 + vec3(0.01, 0.025, 0.04);
+  if (uWaveMix > 0.001) {        // the song: a calm waveform over a faint spectrum
+    float w = texture2D(uWave, vec2(t.x, 0.25)).r;            // time domain, 0..1
+    float sp = texture2D(uWave, vec2(t.x * 0.7, 0.75)).r;     // spectrum, 0..1
+    float line = exp(-pow((t.y - (0.5 + (w - 0.5) * 0.8)) * 90.0, 2.0)) + 0.35 * exp(-pow((t.y - (0.5 + (w - 0.5) * 0.8)) * 22.0, 2.0));
+    float bars = step(t.y, 0.08 + sp * 0.45) * 0.10 * (0.6 + 0.4 * step(0.5, fract(t.x * 64.0)));
+    vec3 wc = vec3(0.45, 0.85, 1.0) * line * 0.9 + vec3(0.2, 0.35, 0.6) * bars + vec3(0.01, 0.02, 0.035);
+    col = mix(col, wc, uWaveMix);
+  }
   float scan = 0.78 + 0.22 * sin(t.y * 520.0);
   float roll = 1.0 + 0.06 * smoothstep(0.02, 0.0, abs(fract(t.y - uTime * 0.07) - 0.5) - 0.0);
   float edge = smoothstep(1.0, 0.86, max(abs(uv.x), abs(uv.y)));
@@ -150,6 +158,7 @@ const LAYOUT = {
     win: [0.3, 1.02, 0.5, 0.42], cork: [-0.33, 1.0, 0.52, 0.38], flyer: [0.45, 0.56, 0.24, 0.33],
     crate: [-0.36, -0.44, 1.02], crateW: 0.55, crateTilt: -1.05,
     prod: [0.03, -0.07, 1.0], prodH: 0.62,
+    boom: [0.5, 0, -0.36], boomW: 0.38, boomYaw: -0.32, cas: [0.5, 0.5], casYaw: 0.35,
   },
   L: {
     cam: [0, 0.92, 2.2], look: [0, 0.24, -0.4], fov: 40, desk: [-1.9, 0.8],
@@ -158,10 +167,17 @@ const LAYOUT = {
     win: [0.36, 0.96, 0.62, 0.48], cork: [-0.6, 0.92, 0.62, 0.44], flyer: [1.0, 0.6, 0.3, 0.41],
     crate: [1.06, -0.36, 0.16], crateW: 0.72, crateTilt: -0.95,
     prod: [-0.02, -0.07, 0.96], prodH: 0.64,
+    boom: [0.62, 0, -0.44], boomW: 0.42, boomYaw: -0.36, cas: [0.3, 0.42], casYaw: 0.3,
   },
 };
 
+// what the song feeds the room each frame (song.js writes it)
+const waveData = new Uint8Array(256 * 2).fill(128);
+export const music = { on: 0, bass: 0, beat: 0, level: 0, waveData, waveTex: null };
+
 export async function buildRoom({ tex, meta, canvases, reduced }) {
+  music.waveTex = new THREE.DataTexture(waveData, 256, 2, THREE.RedFormat, THREE.UnsignedByteType);
+  music.waveTex.magFilter = music.waveTex.minFilter = THREE.LinearFilter; music.waveTex.needsUpdate = true;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0, 0, 0);
   const objs = {};
@@ -212,7 +228,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   const sc = meta.crtScreen, H = 1 / crtA;
   const toLocal = (k) => [sc[k][0] - 0.5, (sc[k][1] - 0.5) * H];
   const screenMat = new THREE.ShaderMaterial({ vertexShader: PHOTO_VERT, fragmentShader: SCREEN_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { map: { value: tex.orbit }, uTime: { value: 0 }, uHover: { value: 0 }, uPower: { value: 2.3 } } });
+    uniforms: { map: { value: tex.orbit }, uTime: { value: 0 }, uHover: { value: 0 }, uPower: { value: 2.3 }, uWave: { value: music.waveTex }, uWaveMix: { value: 0 } } });
   const screen = new THREE.Mesh(quadGeo({ tl: toLocal("tl"), tr: toLocal("tr"), br: toLocal("br"), bl: toLocal("bl") }), screenMat);
   screen.position.set(0, 0.5 / crtA, 0.002); crt.add(screen);
   const scrC = ["tl", "tr", "br", "bl"].map(toLocal).reduce((a, b) => [a[0] + b[0] / 4, a[1] + b[1] / 4], [0, 0]);
@@ -369,6 +385,60 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   const crate = new THREE.Mesh(new THREE.PlaneGeometry(1, 1 / crA), photoMat(tex.crate, { tint: [0.9, 0.82, 0.74], self: 0.12, edge: 0.16, glow: [1, 0.85, 0.6] }));
   scene.add(crate); objs.crate = { mesh: crate, mats: [crate.material], hover: 0 };
 
+  // ---------- the boombox: a real photo on a box; its cones pump with the bass, its door shows the tape
+  const bm = meta.boombox, BA = bm.aspect;
+  const boomMat = new THREE.ShaderMaterial({
+    vertexShader: PHOTO_VERT, transparent: true,
+    uniforms: { ...SHARED, map: { value: tex.boombox }, uHover: { value: 0 }, uPump: { value: 0 }, uDoorMix: { value: 0 }, uPlayDown: { value: 0 },
+      uCones: { value: bm.cones.map((c) => new THREE.Vector3(...c)) }, uDoor: { value: new THREE.Vector4(...bm.door) },
+      uPlay: { value: new THREE.Vector4(...bm.play) }, uAspect: { value: BA }, uLed: { value: 0 } },
+    fragmentShader: /* glsl */ `
+      uniform sampler2D map; uniform vec3 uLP[4]; uniform vec3 uLC[4]; uniform float uLR[4]; uniform vec3 uAmb;
+      uniform float uHover, uPump, uDoorMix, uPlayDown, uAspect, uLed; uniform vec3 uCones[3]; uniform vec4 uDoor, uPlay;
+      varying vec2 vUv; varying vec3 vW; varying vec3 vN;
+      void main() {
+        vec2 uv = vUv; float coneLit = 0.0;
+        for (int i = 0; i < 3; i++) {                 // the cone moves out toward you: sample closer to the centre
+          vec2 d = (uv - uCones[i].xy) * vec2(uAspect, 1.0);
+          float r = uCones[i].z * uAspect, k = smoothstep(r * 0.92, r * 0.15, length(d));
+          uv -= (uv - uCones[i].xy) * uPump * 0.07 * k; coneLit += k;
+        }
+        vec2 pu = vUv;                                // play key: pressed down a little and in shadow
+        float inPlay = step(uPlay.x, pu.x) * step(pu.x, uPlay.z) * step(uPlay.w, pu.y) * step(pu.y, uPlay.y);
+        uv.y += inPlay * uPlayDown * 0.004;
+        vec4 c = texture2D(map, uv);
+        if (c.a < 0.01) discard;
+        float inDoor = smoothstep(uDoor.x, uDoor.x + 0.01, vUv.x) * smoothstep(uDoor.z, uDoor.z - 0.01, vUv.x) * smoothstep(uDoor.y, uDoor.y + 0.01, vUv.y) * smoothstep(uDoor.w, uDoor.w - 0.01, vUv.y);
+        c.rgb *= mix(1.0, mix(0.22, 1.0, uDoorMix), inDoor);   // empty slot until the tape goes in
+        c.rgb *= 1.0 - inPlay * uPlayDown * 0.45;
+        vec3 L = uAmb;
+        for (int i = 0; i < 4; i++) { vec3 d = uLP[i] - vW; float dd = dot(d, d); L += uLC[i] * (0.3 + 0.7 * max(dot(d * inversesqrt(dd), vN), 0.0)) / (1.0 + dd * uLR[i]); }
+        vec3 col = c.rgb * 0.46 * mix(L, vec3(1.0), 0.08);
+        col *= 1.0 + uPump * 0.25 * clamp(coneLit, 0.0, 1.0);
+        col += c.rgb * uHover * 0.5;
+        col += vec3(1.0, 0.25, 0.1) * uLed * smoothstep(0.012, 0.0, length((vUv - vec2(uPlay.z + 0.03, uPlay.w - 0.035)) * vec2(uAspect, 1.0)));
+        gl_FragColor = vec4(col, c.a);
+      }`,
+  });
+  const BW = 1, BH = 1 / BA, BD = 0.3;
+  const boom = new THREE.Group(); scene.add(boom);
+  const boomBody = new THREE.Mesh(new THREE.BoxGeometry(BW * 0.985, BH * 0.96, BD), [dark(0.55), dark(0.55), dark(0.65), dark(0.05), dark(0.4), dark(0.3)]);
+  boomBody.position.set(0, BH / 2, -BD / 2); boom.add(boomBody);
+  const boomFront = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), boomMat); boomFront.position.set(0, BH / 2, 0.001); boom.add(boomFront);
+  const boomShadow = shadow(1.2, 0.5); boomShadow.position.z = -BD / 2; boom.add(boomShadow);
+  objs.boombox = { mesh: boomFront, group: boom, mats: [boomMat], hover: 0 };
+  const doorLocal = () => new THREE.Vector3(((bm.door[0] + bm.door[2]) / 2 - 0.5) * BW, ((bm.door[1] + bm.door[3]) / 2) * BH, 0.01);
+
+  // ---------- the cassette: a real photo, its blank label written on in the site's typeface
+  const cm = meta.cassette, CW = 0.1, CH = CW / cm.aspect;
+  const casMat = photoMat(canvases.cassette, { tint: [0.95, 0.93, 0.9], self: 0.12 });
+  const cas = new THREE.Group(); scene.add(cas);
+  const casBody = new THREE.Mesh(new THREE.BoxGeometry(CW * 0.98, 0.011, CH * 0.98), dark(0.12)); casBody.position.y = 0.0055; cas.add(casBody);
+  const casTop = new THREE.Mesh(new THREE.PlaneGeometry(CW, CH), casMat); casTop.rotation.x = -Math.PI / 2; casTop.position.y = 0.0112; cas.add(casTop);
+  const casShadow = shadow(CW * 1.6, CH * 1.6, 0.7); cas.add(casShadow);
+  objs.cassette = { mesh: casTop, group: cas, mats: [casMat], hover: 0 };
+  const casHome = { pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
+
   // ---------- cables
   const cableMat = photoMat(tex.desk, { tint: [0.05, 0.05, 0.05], transparent: false });
   const cables = [0, 1, 2, 3].map(() => { const m = new THREE.Mesh(new THREE.BufferGeometry(), cableMat); scene.add(m); return m; });
@@ -399,6 +469,9 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     producer.position.set(pr[0], pr[1], pr[2]); producer.scale.set(ph, ph, ph);
     chair.position.set(pr[0] + 0.01, pr[1] - 0.08, pr[2] + 0.07);
     chairShade.position.set(pr[0], pr[1] + 0.12, pr[2] + 0.02);
+    const bo = v("boom"); boom.position.set(...bo); boom.scale.setScalar(s("boomW")); boom.rotation.y = s("boomYaw");
+    const cp = v("cas"); cas.position.set(cp[0], 0, cp[1]); cas.rotation.set(0, s("casYaw"), 0); cas.scale.setScalar(1);
+    casHome.pos.copy(cas.position); casHome.quat.copy(cas.quaternion);
     crate.position.set(...v("crate")); crate.scale.setScalar(s("crateW")); crate.rotation.x = s("crateTilt");
     const M = mpc.position, T = tt.position, C = crt.position;
     cable(cables[0], [[M.x + 0.1, 0.03, M.z - 0.2], [M.x + 0.14, 0.004, M.z - 0.32], [M.x + 0.05, 0.004, -0.5], [C.x - 0.1, 0.004, -0.88], [C.x - 0.2, 0.15, -0.98]]);
@@ -430,12 +503,14 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     winMat.uniforms.uTime.value = reduced ? 0 : t;
     const flick = reduced ? 1 : 0.94 + 0.06 * Math.sin(t * 9.1) * Math.sin(t * 3.3);
     LIGHTS.col[1].set(0.3, 0.48, 0.85).multiplyScalar(flick * (1 + objs.orbit.hover * 0.6));
-    LIGHTS.col[0].set(1.0, 0.6, 0.3).multiplyScalar(2.1 * (reduced ? 1 : 0.985 + 0.015 * Math.sin(t * 1.3)));
+    LIGHTS.col[0].set(1.0, 0.6, 0.3).multiplyScalar(2.1 * (reduced ? 1 : 0.985 + 0.015 * Math.sin(t * 1.3)) * (1 + music.on * (0.1 * music.beat + 0.08 * music.bass)));
     LIGHTS.col[3].set(0.05, 0.07, 0.12);
     // pads: a quiet loop, brighter when the MPC is under the hand
     const lineOn = Math.max(objs.line.hover, objs.construct.hover, objs.vision.hover);
     const step = Math.floor(t / (beat / 2));
-    if (!reduced && step !== lastStep) {
+    if (music.on > 0.5) {                            // the song plays the pads: a few light on each beat
+      if (music.beatHit) { music.beatHit = false; const n = 2 + (Math.random() * 3 | 0); for (let i = 0; i < n; i++) { const p = pads[(Math.random() * 16) | 0]; if (p !== padConstruct && p !== padVision) p.level = reduced ? 0.4 : 1.1; } }
+    } else if (!reduced && step !== lastStep) {
       lastStep = step;
       for (const i of PATTERN[step % PATTERN.length]) pads[i].level = Math.max(pads[i].level, 0.45);
     }
@@ -453,6 +528,10 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
       p.m.uniforms.uI.value = I * 1.6; padLight += I;
     }
     LIGHTS.col[2].set(0.5, 0.25, 0.3).multiplyScalar(padLight * 0.02);
+    // the boombox and the CRT follow the song
+    boomMat.uniforms.uPump.value = reduced ? 0 : music.bass * music.on;
+    screenMat.uniforms.uWaveMix.value += ((music.on > 0.01 ? 1 : 0) - screenMat.uniforms.uWaveMix.value) * Math.min(1, dt * 1.5);
+    if (music.on) music.waveTex.needsUpdate = true;
     // record: spins up when hovered or open, slows like a real platter when let go
     const q = objs.quest, want = (state.hover === "quest" || state.open === "quest") && !reduced ? 3.49 : 0;
     q.speed += (want - q.speed) * Math.min(1, dt * (want ? 0.9 : 0.45));
@@ -483,10 +562,13 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   function normal(id) {
     if (id === "line" || id === "construct" || id === "vision" || id === "quest") return new THREE.Vector3(0, 1, 0.55).normalize();
     if (id === "producer") return new THREE.Vector3(0.15, 0.35, 1).normalize();
+    if (id === "cassette") return new THREE.Vector3(0, 1, 0.5).normalize();
+    if (id === "boombox") return new THREE.Vector3(Math.sin(objs.boombox.group.rotation.y), 0.12, Math.cos(objs.boombox.group.rotation.y)).normalize();
     if (id === "crate") return new THREE.Vector3(0, Math.cos(objs.crate.mesh.rotation.x + Math.PI / 2) * -1, 1).normalize();
     return new THREE.Vector3(0, 0.1, 1).normalize();
   }
-  const size = { orbit: 0.3, quest: 0.24, ruckus: 0.2, line: 0.25, construct: 0.25, vision: 0.25, crate: 0.4, producer: 0.3 };
+  const size = { orbit: 0.3, quest: 0.24, ruckus: 0.2, line: 0.25, construct: 0.25, vision: 0.25, crate: 0.4, producer: 0.3, cassette: 0.07, boombox: 0.22 };
+  const song = { boom, boomMat, cas, casHome, doorLocal, CW };
 
-  return { scene, camera, rig, objs, layout, update, corners, center, normal, size, byId };
+  return { scene, camera, rig, objs, layout, update, corners, center, normal, size, byId, song };
 }

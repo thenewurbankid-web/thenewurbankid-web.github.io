@@ -29,8 +29,27 @@ function pin(g, x, y, col) {
   g.fillStyle = gr; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.restore();
 }
 
+// the tape's label, written in the site's typeface like a pen label
+export const SONG = { title: "The New Urban Kid (freestyle)", artist: "Shashank Raju", credit: "beat by El-P" };
+function cassetteLabel(photo, m) {
+  const W = photo.width, H = photo.height, [c, g] = canvas(W, H);
+  g.drawImage(photo, 0, 0);
+  const band = (b) => ({ x: b[0] * W, y: (1 - b[3]) * H, w: (b[2] - b[0]) * W, h: (b[3] - b[1]) * H });
+  const top = band(m.top), bot = band(m.bottom);
+  g.fillStyle = "rgba(24, 28, 52, .86)"; g.textBaseline = "middle";
+  g.save(); g.translate(top.x + top.w * 0.06, top.y + top.h * 0.56); g.rotate(-0.018);
+  let fs = top.h * 0.5; g.font = `italic 300 ${fs}px ${FONT}`;
+  while (g.measureText(SONG.title).width > top.w * 0.88 && fs > 8) { fs -= 1; g.font = `italic 300 ${fs}px ${FONT}`; }
+  g.fillText(SONG.title, 0, 0); g.restore();
+  g.save(); g.translate(bot.x + bot.w * 0.06, bot.y + bot.h * 0.5); g.rotate(0.012);
+  g.font = `italic 300 ${Math.round(bot.h * 0.36)}px ${FONT}`; g.fillText(`${SONG.artist} · ${SONG.credit}`, 0, 0); g.restore();
+  g.strokeStyle = "rgba(24, 28, 52, .5)"; g.lineWidth = Math.max(1, H * 0.004);   // a pen underline
+  g.beginPath(); g.moveTo(top.x + top.w * 0.06, top.y + top.h * 0.86); g.quadraticCurveTo(top.x + top.w * 0.4, top.y + top.h * 0.9, top.x + top.w * 0.7, top.y + top.h * 0.84); g.stroke();
+  return tex(c);
+}
+
 export async function makeCanvases(img) {
-  await Promise.all(["200 60px Jost", "300 30px Jost", "400 20px Jost"].map((f) => document.fonts.load(f).catch(() => {})));
+  await Promise.all(["200 60px Jost", "300 30px Jost", "400 20px Jost", "italic 300 30px Jost"].map((f) => document.fonts.load(f).catch(() => {})));
 
   // ---- cork board
   const [cc, g] = canvas(1024, 740);
@@ -101,5 +120,5 @@ export async function makeCanvases(img) {
   l.fillStyle = "#050505"; l.beginPath(); l.arc(256, 256, 12, 0, 7); l.fill();
   l.restore();
 
-  return { cork: tex(cc), flyer: tex(fc), label: tex(lc) };
+  return { cork: tex(cc), flyer: tex(fc), label: tex(lc), cassette: cassetteLabel(img.cassette, img.cassetteMeta) };
 }

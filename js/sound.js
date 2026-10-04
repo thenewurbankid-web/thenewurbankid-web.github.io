@@ -19,15 +19,18 @@ export function makeSound() {
     const hum = ctx.createOscillator(); hum.frequency.value = 55; const hg = ctx.createGain(); hg.gain.value = 0.012;
     hum.connect(hg).connect(master); hum.start();
   }
-  let on = false;
+  let on = false, ducked = false;
+  const level = () => (on && !ducked ? 0.5 : 0);
   return {
     toggle() {
       if (!ctx) build();
       on = !on;
       if (ctx.state === "suspended") ctx.resume();
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.setTargetAtTime(on ? 0.5 : 0, ctx.currentTime, 0.6);
+      master.gain.setTargetAtTime(level(), ctx.currentTime, 0.6);
       return on;
     },
+    duck(d) { ducked = d; if (ctx) master.gain.setTargetAtTime(level(), ctx.currentTime, 0.4); },
+    get on() { return on; },
   };
 }
