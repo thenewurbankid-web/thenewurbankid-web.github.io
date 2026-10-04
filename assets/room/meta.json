@@ -125,5 +125,11 @@
  "lampBulb": [
   0.8725,
   0.5374
- ]
+ ],
+ "producer": {
+  "neckV": 0.6257,
+  "spineU": 0.4996,
+  "headTopV": 0.9429,
+  "aspect": 0.5573
+ }
 }
