@@ -302,26 +302,18 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   const prodMat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: true,
     uniforms: {
-      map: { value: tex.producer }, uNeck: { value: pm.neckV }, uBreath: { value: 0 }, uNod: { value: 0 },
-      uLean: { value: 0 }, uHover: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / tex.producer.image.width, 1 / tex.producer.image.height) },
+      map: { value: tex.producer }, uNeck: { value: pm.neckV }, uBreath: { value: 0 },
+      uHover: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / tex.producer.image.width, 1 / tex.producer.image.height) },
       uKey: { value: new THREE.Color(1.0, 0.62, 0.36) }, uRim: { value: new THREE.Color(0.42, 0.62, 1.0) }, uRimI: { value: 1 }, uRimR: { value: tex.producer.image.width > 700 ? 4.5 : 3.0 },
     },
     vertexShader: /* glsl */ `
-      uniform float uNeck, uBreath, uNod, uLean; varying vec2 vUv;
+      uniform float uNeck, uBreath; varying vec2 vUv;
       void main() {
         vUv = uv; vec3 p = position;
         // breathing: the back widens and the shoulders lift a little
         float torso = 1.0 - smoothstep(uNeck - 0.05, uNeck + 0.02, uv.y);
-        p.x *= 1.0 + uBreath * 0.006 * torso;
-        p.y += uBreath * 0.0035 * smoothstep(0.2, uNeck, uv.y);
-        // head nod: the head tips forward and down about the neck
-        float head = smoothstep(uNeck - 0.06, uNeck + 0.04, uv.y);
-        float hy = p.y - (uNeck - 0.5);
-        p.y -= head * uNod * (0.012 + hy * 0.035);
-        p.z -= head * uNod * hy * 0.12;
-        // the reach: a lean to the left toward the MPC, more at the shoulders than at the chair
-        float k = smoothstep(0.0, 1.0, uv.y);
-        p.x += uLean * 0.05 * k; p.y -= uLean * 0.012 * k; p.z -= uLean * 0.03 * k;
+        p.x *= 1.0 + uBreath * 0.003 * torso;
+        p.y += uBreath * 0.002 * smoothstep(0.2, uNeck, uv.y);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       }`,
     fragmentShader: /* glsl */ `
@@ -364,7 +356,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   const chairShade = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.16), new THREE.MeshBasicMaterial({
     map: radialTex([[0, "rgba(0,0,0,.75)"], [0.6, "rgba(0,0,0,.35)"], [1, "rgba(0,0,0,0)"]]), transparent: true, depthWrite: false }));
   scene.add(chairShade);
-  objs.producer = { mesh: producer, mats: [prodMat], hover: 0, reach: 0, nextReach: 6 };
+  objs.producer = { mesh: producer, mats: [prodMat], hover: 0 };
 
   // ---------- the crate on the floor
   const crA = tex.crate.image.width / tex.crate.image.height;
@@ -417,7 +409,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   }
 
   // ---------- per-frame: hover easing, pads, screen, record
-  const beat = 60 / 90; // the head nods at 90 BPM
+  const beat = 60 / 90; // the pads pulse at 90 BPM
   const PATTERN = [[0, 12], [2], [1, 6], [2], [0, 9], [2, 14], [1, 6], [3]];
   let lastStep = -1;
   function update(dt, t, state) {
@@ -441,24 +433,8 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
       lastStep = step;
       for (const i of PATTERN[step % PATTERN.length]) pads[i].level = Math.max(pads[i].level, 0.45);
     }
-    // the producer: breath, nod on the beat, and now and then a reach to the MPC that taps a pad
-    const P = objs.producer;
-    if (!reduced) {
-      prodMat.uniforms.uBreath.value = Math.sin(t * 2 * Math.PI / 4.2);
-      const ph = (t / beat) % 1;
-      const nod = Math.pow(Math.max(0, Math.sin(ph * Math.PI)), 2.5);
-      P.nodAmt = (P.nodAmt ?? 0) + ((P.reach > 0.05 ? 0.4 : 1) - (P.nodAmt ?? 0)) * Math.min(1, dt * 2);
-      prodMat.uniforms.uNod.value = nod * P.nodAmt;
-      if (t > P.nextReach && !state.open) { P.reachT = 0; P.nextReach = t + 9 + Math.random() * 8; P.tapped = false; }
-      if (P.reachT !== undefined) {
-        P.reachT += dt;
-        const u = P.reachT / 3.2;                                  // lean in, tap, settle back
-        P.reach = u < 1 ? Math.sin(Math.PI * Math.min(1, u)) ** 2 : 0;
-        if (!P.tapped && u > 0.45) { P.tapped = true; for (const i of [8, 9, 5].slice(0, 1 + Math.floor(Math.random() * 3))) pads[i].level = 1.6; }
-        if (u >= 1) P.reachT = undefined;
-      }
-      prodMat.uniforms.uLean.value = P.reach;
-    } else { prodMat.uniforms.uBreath.value = 0; prodMat.uniforms.uNod.value = 0; prodMat.uniforms.uLean.value = 0; }
+    // the producer holds still apart from a slow breath; no head motion, no lean
+    prodMat.uniforms.uBreath.value = reduced ? 0 : Math.sin(t * 2 * Math.PI / 4.6);
     let padLight = 0;
     for (const p of pads) {
       p.level *= Math.exp(-dt * 5.0);

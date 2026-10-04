@@ -5,8 +5,7 @@ The portfolio of The New Urban Kid, Shashank Penumatcha.
 **v2** (the site root) is a hip-hop producer's home studio at night, seen first person. It is built from real
 photos on planes and simple boxes at real depths in one WebGL scene (three.js 0.170.0 from jsDelivr), lit only by
 the practical lights: the desk lamp, the glow of the CRT, the MPC pads and two red LEDs. At the centre, the producer
-sits at the desk with headphones on, seen from behind: breathing, nodding at 90 BPM and now and then leaning in to tap
-the MPC. Focus or tap them for **About**: Shashank Penumatcha, The New Urban Kid, what the projects are, and GitHub.
+sits at the desk with headphones on, seen from behind, still apart from a slow breath while the MPC pads pulse. Focus or tap them for **About**: Shashank Penumatcha, The New Urban Kid, what the projects are, and GitHub.
 Each piece of gear is a project:
 
 - **Orbit**: the CRT, glowing with the Orbit space scene
