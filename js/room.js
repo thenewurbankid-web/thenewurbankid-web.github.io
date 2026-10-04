@@ -303,7 +303,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     transparent: true, depthWrite: true,
     uniforms: {
       map: { value: tex.producer }, uNeck: { value: pm.neckV }, uBreath: { value: 0 },
-      uHover: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / tex.producer.image.width, 1 / tex.producer.image.height) },
+      uHover: { value: 0 }, uFade: { value: 1 }, uTexel: { value: new THREE.Vector2(1 / tex.producer.image.width, 1 / tex.producer.image.height) },
       uKey: { value: new THREE.Color(1.0, 0.62, 0.36) }, uRim: { value: new THREE.Color(0.42, 0.62, 1.0) }, uRimI: { value: 1 }, uRimR: { value: tex.producer.image.width > 800 ? 3.0 : 2.2 },
     },
     vertexShader: /* glsl */ `
@@ -317,7 +317,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       }`,
     fragmentShader: /* glsl */ `
-      uniform sampler2D map; uniform vec2 uTexel; uniform vec3 uKey, uRim; uniform float uHover, uRimI, uRimR;
+      uniform sampler2D map; uniform vec2 uTexel; uniform vec3 uKey, uRim; uniform float uHover, uRimI, uRimR, uFade;
       varying vec2 vUv;
       float A(vec2 o) { return texture2D(map, vUv + o * uTexel).a; }
       void main() {
@@ -342,7 +342,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
         col += uKey * rim * left * 0.04;
         col *= 1.0 + uHover * 0.55;
         col += vec3(1.0, 0.8, 0.6) * rim * uHover * 0.12;
-        gl_FragColor = vec4(col, c.a);
+        gl_FragColor = vec4(col, c.a * uFade);
       }`,
   });
   const PA = pm.aspect;
@@ -351,12 +351,18 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   // the chair back hides the lower back and takes a contact shadow
   // a rounded chair back: a squashed capsule, lit from the lamp side like everything else
   const chairGeo = new THREE.CapsuleGeometry(0.2, 0.12, 8, 24); chairGeo.rotateZ(Math.PI / 2); chairGeo.scale(1, 1.05, 0.22);
-  const chair = new THREE.Mesh(chairGeo, photoMat(tex.desk, { tint: [0.09, 0.085, 0.085], transparent: false }));
+  const chair = new THREE.Mesh(chairGeo, photoMat(tex.desk, { tint: [0.09, 0.085, 0.085], transparent: true }));
   scene.add(chair);
   const chairShade = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.16), new THREE.MeshBasicMaterial({
     map: radialTex([[0, "rgba(0,0,0,.75)"], [0.6, "rgba(0,0,0,.35)"], [1, "rgba(0,0,0,0)"]]), transparent: true, depthWrite: false }));
   scene.add(chairShade);
-  objs.producer = { mesh: producer, mats: [prodMat], hover: 0 };
+  objs.producer = { mesh: producer, mats: [prodMat], hover: 0, chair, chairShade };
+  // fade him (and his chair) when the camera looks past him at gear he would hide; 1 = fully there
+  function setProducerFade(f) {
+    prodMat.uniforms.uFade.value = f; chair.material.uniforms.uOpacity.value = f; chairShade.material.opacity = f;
+    producer.visible = f > 0.01; chair.visible = f > 0.01; chair.material.depthWrite = f > 0.98;
+  }
+  objs.producer.setFade = setProducerFade;
 
   // ---------- the crate on the floor
   const crA = tex.crate.image.width / tex.crate.image.height;

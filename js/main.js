@@ -120,6 +120,13 @@ function setHover(id) {
   }
 }
 const v3 = new THREE.Vector3();
+function prodRect(W, H) {
+  if (room.objs.producer.mesh.material.uniforms.uFade.value < 0.5) return null;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const p of room.corners("producer")) { v3.copy(p).project(camera); const x = (v3.x * 0.5 + 0.5) * W, y = (-v3.y * 0.5 + 0.5) * H;
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return { x0, y0, x1, y1 };
+}
 function placeHots() {
   const W = innerWidth, H = innerHeight;
   for (const [id, a] of Object.entries(hots)) {
@@ -137,8 +144,11 @@ function placeHots() {
     a.style.transform = `translate(${x0}px, ${y0}px)`; a.style.width = `${Math.max(0, x1 - x0)}px`; a.style.height = `${Math.max(0, y1 - y0)}px`;
     a.dataset.cx = (x0 + x1) / 2; a.dataset.top = y0;
     if (state.hover === id) {
-      tagEl.style.left = `${Math.min(W - 90, Math.max(90, (x0 + x1) / 2))}px`;
-      tagEl.style.top = `${Math.max(64, y0 + (id === "crate" ? 30 : -4))}px`;
+      const lx = Math.min(W - 90, Math.max(90, (x0 + x1) / 2));
+      let ly = Math.max(64, y0 + (id === "crate" ? 30 : -4));
+      const pr = prodRect(W, H);                      // the tape label sits above the object; if he is there, put it below
+      if (id !== "producer" && pr && lx > pr.x0 - 80 && lx < pr.x1 + 80 && ly > pr.y0 - 4 && ly - 44 < pr.y1) ly = Math.min(H - 20, y1 + 48);
+      tagEl.style.left = `${lx}px`; tagEl.style.top = `${ly}px`;
     }
   }
 }
@@ -201,6 +211,23 @@ const look = { x: 0, y: 0, vx: 0, vy: 0, dolly: 0, tdolly: 0 };
 let lastFocus = null;
 
 const pc = new THREE.Vector3();
+// the sideways/up shift that keeps the producer off a peeked object; cached per object and screen shape
+const peekCache = new Map();
+function peekOffset(id, pos, aim, fov) {
+  const key = `${id}:${camera.aspect.toFixed(3)}`;
+  if (peekCache.has(key)) return peekCache.get(key);
+  if (!OCCLUDABLE.has(id)) { peekCache.set(key, { x: 0, y: 0 }); return { x: 0, y: 0 }; }
+  const fwd = aim.clone().sub(pos).normalize(), right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(right, fwd);
+  const side = Math.sign(room.center(id, v3).x - room.center("producer", new THREE.Vector3()).x) || 1;
+  let best = { x: 0, y: 0 }, bestO = 2;
+  for (const y of [0, 0.1, 0.2, 0.32, 0.45]) for (const x of [0, 0.1, 0.2, 0.32, 0.45, 0.6]) {
+    const p = pos.clone().addScaledVector(right, x * side).addScaledVector(up, y);
+    const o = occlusion(id, { pos: p, look: aim, fov });
+    if (o < 0.02) { best = { x: x * side, y }; bestO = o; break; }
+    if (o < bestO) { bestO = o; best = { x: x * side, y }; }
+  }
+  peekCache.set(key, best); return best;
+}
 function restShot() {
   const fwd = rig.look.clone().sub(rig.pos).normalize();
   const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
@@ -213,14 +240,54 @@ function restShot() {
   if (peek.id && !state.open) {                 // frame the focused object without pushing all the way in
     room.center(peek.id, pc);
     aim.lerp(pc, 0.5); pos.lerp(pc, 0.16); fov *= 0.9;
+    const off = peekOffset(peek.id, pos, aim, fov);
+    pos.addScaledVector(right, off.x).addScaledVector(up, off.y);
   }
   return { pos, look: aim, fov };
 }
+// ---- occlusion: the producer sits between the room camera and the desk, so every framing is checked against him
+const occCam = new THREE.PerspectiveCamera(50, 1, 0.05, 30);
+const OCCLUDABLE = new Set(["orbit", "quest", "line", "construct", "vision", "ruckus", "crate"]);
+function screenRect(pts, cam) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, zs = 0;
+  for (const p of pts) { v3.copy(p).applyMatrix4(cam.matrixWorldInverse); zs += -v3.z; v3.applyMatrix4(cam.projectionMatrix);
+    x0 = Math.min(x0, v3.x); x1 = Math.max(x1, v3.x); y0 = Math.min(y0, v3.y); y1 = Math.max(y1, v3.y); }
+  return { x0, y0, x1, y1, z: zs / pts.length };
+}
+// share of the object's on-screen box that the producer covers from this pose (0 = clear)
+function occlusion(id, pose, aspect = camera.aspect) {
+  if (id === "producer" || !room.objs[id]) return 0;
+  occCam.fov = pose.fov; occCam.aspect = aspect; occCam.updateProjectionMatrix();
+  occCam.position.copy(pose.pos); occCam.lookAt(pose.look); occCam.updateMatrixWorld();
+  const o = screenRect(room.corners(id), occCam), p = screenRect(room.corners("producer"), occCam);
+  if (p.z >= o.z) return 0;                                   // he is behind it
+  const p0 = { x0: Math.max(-1, o.x0), x1: Math.min(1, o.x1), y0: Math.max(-1, o.y0), y1: Math.min(1, o.y1) };
+  const area = Math.max(1e-6, (p0.x1 - p0.x0) * (p0.y1 - p0.y0));
+  const ix = Math.max(0, Math.min(p0.x1, p.x1) - Math.max(p0.x0, p.x0)), iy = Math.max(0, Math.min(p0.y1, p.y1) - Math.max(p0.y0, p.y0));
+  return (ix * iy) / area;
+}
+// try framings around the object (from its side of the producer first, then higher) until he is out of the way
+function clearShot(id, make) {
+  const c = room.center(id, new THREE.Vector3()), pc = room.center("producer", new THREE.Vector3());
+  const side = Math.sign(c.x - pc.x) || 1;
+  let best = null, bestO = 2;
+  for (const lift of [0, 0.22, 0.45]) for (const yaw of [0, 0.3, 0.55, 0.8, -0.3, -0.55]) {
+    const shot = make(yaw * side, lift); const o = occlusion(id, shot);
+    if (o < 0.02) return shot;
+    if (o < bestO) { bestO = o; best = shot; }
+  }
+  return best;
+}
 function objectShot(id) {
+  if (OCCLUDABLE.has(id)) return clearShot(id, (yaw, lift) => objectShotAt(id, yaw, lift));
+  return objectShotAt(id, 0, 0);
+}
+function objectShotAt(id, yaw, lift) {
   const c = room.center(id, new THREE.Vector3());
   const n = room.normal(id);
   const toRig = rig.pos.clone().sub(c).normalize();
-  const dir = toRig.lerp(n, 0.55).normalize();
+  const dir = toRig.lerp(n, 0.55).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  dir.y += lift; dir.normalize();
   const fov = rig.fov * (camera.aspect < 1 ? 0.78 : 0.82);
   const half = THREE.MathUtils.degToRad(fov / 2);
   const r = room.size[id];
@@ -362,6 +429,7 @@ function resize() {
   film.setSize(W, H, dpr);
   camera.aspect = W / H;
   room.layout(camera.aspect);
+  peekCache.clear();
   film.u.uMaxBlur.value = H * dpr * 0.011;
   film.u.uLeakPos.value.set(camera.aspect < 1 ? -0.05 : 0.02, camera.aspect < 1 ? 0.62 : 0.7);
   if (state.open && state.open !== "crate") { const s = objectShot(state.open === "construct" || state.open === "vision" ? "line" : state.open); shot.to = s; shot.t = 1; Object.assign(camState, { pos: s.pos.clone(), look: s.look.clone(), fov: s.fov }); }
@@ -372,7 +440,7 @@ resize();
 if (!reduced) camState.pos.add(new THREE.Vector3(0, 0.12, 0.55)); // the intro: drift in slowly from the doorway
 
 // ------------------------------------------------------------------ frame loop
-let fpsT = 0, fpsN = 0, checked = false;
+let fpsT = 0, fpsN = 0, checked = false, prodFade = 1;
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   // parallax eases toward the pointer or tilt
@@ -411,6 +479,14 @@ function frame() {
   film.u.uTime.value = reduced ? 0 : t;
   film.u.uLeak.value = reduced ? 0.03 : 0.045 + 0.02 * Math.sin(t * 0.21);
   room.update(dt, t, state);
+  {
+    const target = state.open && state.open !== "producer" ? (state.open === "construct" || state.open === "vision" ? "line" : state.open) : peek.id;
+    const pose = { pos: camera.position, look: camState.look, fov: camera.fov };
+    const covered = target && target !== "producer" && occlusion(target, pose) > 0.02;
+    const want = covered || (state.open && OCCLUDABLE.has(state.open)) ? 0.2 : 1;
+    prodFade += (want - prodFade) * (reduced ? 1 : 1 - Math.exp(-dt * 2.5));
+    room.objs.producer.setFade(prodFade);
+  }
   placeHots();
   film.render(scene, camera);
   // step down on slow phones after the first seconds
@@ -433,4 +509,4 @@ if (start && (byId(start) || start === "crate" || start === "producer")) {
   history.replaceState(null, "", location.pathname + location.search); history.pushState({ id: start }, "", `#${start}`);
   setTimeout(() => open(start), reduced ? 0 : 900);
 }
-window.__studio = { state, open: navigate, back, camState, look, peek };
+window.__studio = { state, open: navigate, back, camState, look, peek, occlusion: (id) => occlusion(state.open && (id === "construct" || id === "vision") ? "line" : id, { pos: camera.position.clone(), look: camState.look.clone(), fov: camera.fov }), get producerFade() { return prodFade; } };
