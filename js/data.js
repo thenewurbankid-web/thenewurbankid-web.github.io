@@ -4,6 +4,8 @@ export const OWNER = {
   name: "The New Urban Kid",
   person: "Shashank Penumatcha",
   line: "Builder of games, tools and AI agent systems.",
+  // What the projects on this site show, in one line (each part is backed by a project below).
+  summary: "Games, a realtime status board for AI agents, a front-end framework, and a pipeline that turns web pages into components.",
   github: "https://github.com/thenewurbankid-web",
 };
 

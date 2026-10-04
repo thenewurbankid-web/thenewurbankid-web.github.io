@@ -148,7 +148,8 @@ const LAYOUT = {
     crt: [0.02, 0, -0.62], crtW: 0.56, spL: [-0.55, 0, -0.74], spR: [0.55, 0, -0.76],
     lamp: [-0.92, 0, -0.84], mpc: [-0.2, 0, 0.42], mpcYaw: 0.08, tt: [0.33, 0, 0.12], ttYaw: -0.14,
     win: [0.3, 1.02, 0.5, 0.42], cork: [-0.33, 1.0, 0.52, 0.38], flyer: [0.45, 0.56, 0.24, 0.33],
-    crate: [0.02, -0.4, 0.98], crateW: 0.98, crateTilt: -1.05,
+    crate: [-0.36, -0.44, 1.02], crateW: 0.55, crateTilt: -1.05,
+    prod: [0.03, -0.3, 1.0], prodH: 0.76,
   },
   L: {
     cam: [0, 0.92, 2.2], look: [0, 0.24, -0.4], fov: 40, desk: [-1.9, 0.8],
@@ -156,6 +157,7 @@ const LAYOUT = {
     lamp: [-1.42, 0, -0.8], mpc: [-0.36, 0, 0.14], mpcYaw: 0.08, tt: [0.36, 0, -0.04], ttYaw: -0.12,
     win: [0.36, 0.96, 0.62, 0.48], cork: [-0.6, 0.92, 0.62, 0.44], flyer: [1.0, 0.6, 0.3, 0.41],
     crate: [1.06, -0.36, 0.16], crateW: 0.72, crateTilt: -0.95,
+    prod: [-0.02, -0.3, 0.96], prodH: 0.78,
   },
 };
 
@@ -295,6 +297,75 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   tt.add(shadow(TW * 1.3, TD * 1.4));
   objs.quest = { mesh: plinth, group: tt, mats: [recMat, label.material], hover: 0, spin, speed: 0, recCenter: new THREE.Vector3() };
 
+  // ---------- the producer: a real photo, cut out, relit by the lamp (warm, left) and the CRT (cool rim)
+  const pm = meta.producer;
+  const prodMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: true,
+    uniforms: {
+      map: { value: tex.producer }, uNeck: { value: pm.neckV }, uBreath: { value: 0 }, uNod: { value: 0 },
+      uLean: { value: 0 }, uHover: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / tex.producer.image.width, 1 / tex.producer.image.height) },
+      uKey: { value: new THREE.Color(1.0, 0.62, 0.36) }, uRim: { value: new THREE.Color(0.42, 0.62, 1.0) }, uRimI: { value: 1 }, uRimR: { value: tex.producer.image.width > 700 ? 4.5 : 3.0 },
+    },
+    vertexShader: /* glsl */ `
+      uniform float uNeck, uBreath, uNod, uLean; varying vec2 vUv;
+      void main() {
+        vUv = uv; vec3 p = position;
+        // breathing: the back widens and the shoulders lift a little
+        float torso = 1.0 - smoothstep(uNeck - 0.05, uNeck + 0.02, uv.y);
+        p.x *= 1.0 + uBreath * 0.006 * torso;
+        p.y += uBreath * 0.0035 * smoothstep(0.2, uNeck, uv.y);
+        // head nod: the head tips forward and down about the neck
+        float head = smoothstep(uNeck - 0.06, uNeck + 0.04, uv.y);
+        float hy = p.y - (uNeck - 0.5);
+        p.y -= head * uNod * (0.012 + hy * 0.035);
+        p.z -= head * uNod * hy * 0.12;
+        // the reach: a lean to the left toward the MPC, more at the shoulders than at the chair
+        float k = smoothstep(0.0, 1.0, uv.y);
+        p.x += uLean * 0.05 * k; p.y -= uLean * 0.012 * k; p.z -= uLean * 0.03 * k;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D map; uniform vec2 uTexel; uniform vec3 uKey, uRim; uniform float uHover, uRimI, uRimR;
+      varying vec2 vUv;
+      float A(vec2 o) { return texture2D(map, vUv + o * uTexel).a; }
+      void main() {
+        vec4 c = texture2D(map, vUv);
+        c.a *= smoothstep(0.0, 0.12, vUv.y);
+        if (c.a < 0.01) discard;
+        // edge light from the gear in front of them: how much of the neighbourhood is empty, and on which side
+        float r = uRimR; vec2 dir = vec2(0.0); float empty = 0.0;
+        for (int i = 0; i < 12; i++) {
+          float a = float(i) * 0.5236; vec2 o = vec2(cos(a), sin(a));
+          float e = 1.0 - A(o * r); empty += e; dir += o * e;
+        }
+        empty /= 12.0;
+        float rim = smoothstep(0.08, 0.5, empty) * c.a * smoothstep(0.5, 0.66, vUv.y);
+        float left = clamp(-dir.x * 0.25 + 0.5, 0.0, 1.0);          // left edges face the lamp
+        float up = clamp(dir.y * 0.3 + 0.4, 0.0, 1.0);              // shoulders and headphones catch the CRT
+        // warm key falls off from the lamp side; the far side drops into the dark
+        float key = mix(1.0, 0.35, smoothstep(0.1, 0.95, vUv.x)) * mix(0.55, 1.0, smoothstep(0.15, 0.7, vUv.y));
+        vec3 col = c.rgb * uKey * key * 1.15;
+        col += c.rgb * vec3(0.10, 0.12, 0.16);                       // a little cool fill from the screen
+        col += uRim * rim * up * (1.0 - left * 0.6) * 0.16 * uRimI;
+        col += uKey * rim * left * 0.1;
+        col *= 1.0 + uHover * 0.55;
+        col += vec3(1.0, 0.8, 0.6) * rim * uHover * 0.12;
+        gl_FragColor = vec4(col, c.a);
+      }`,
+  });
+  const PA = pm.aspect;
+  const producer = new THREE.Mesh(new THREE.PlaneGeometry(PA, 1, 16, 48), prodMat);
+  producer.geometry.translate(0, 0.5, 0); producer.renderOrder = 4; scene.add(producer);
+  // the chair back hides the lower back and takes a contact shadow
+  // a rounded chair back: a squashed capsule, lit from the lamp side like everything else
+  const chairGeo = new THREE.CapsuleGeometry(0.2, 0.12, 8, 24); chairGeo.rotateZ(Math.PI / 2); chairGeo.scale(1, 1.05, 0.22);
+  const chair = new THREE.Mesh(chairGeo, photoMat(tex.desk, { tint: [0.09, 0.085, 0.085], transparent: false }));
+  scene.add(chair);
+  const chairShade = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.16), new THREE.MeshBasicMaterial({
+    map: radialTex([[0, "rgba(0,0,0,.75)"], [0.6, "rgba(0,0,0,.35)"], [1, "rgba(0,0,0,0)"]]), transparent: true, depthWrite: false }));
+  scene.add(chairShade);
+  objs.producer = { mesh: producer, mats: [prodMat], hover: 0, reach: 0, nextReach: 6 };
+
   // ---------- the crate on the floor
   const crA = tex.crate.image.width / tex.crate.image.height;
   const crate = new THREE.Mesh(new THREE.PlaneGeometry(1, 1 / crA), photoMat(tex.crate, { tint: [0.9, 0.82, 0.74], self: 0.12, edge: 0.16, glow: [1, 0.85, 0.6] }));
@@ -326,6 +397,10 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     const c = v("cork"); cork.position.set(c[0], c[1], -0.994); cork.scale.set(c[2], c[3], 1);
     const f = v("flyer"); flyer.position.set(f[0], f[1], -0.992); flyer.scale.set(f[2], f[3], 1); flyer.rotation.z = -0.03;
     const dk = v("desk"); desk.scale.x = edge.scale.x = dk[1] - dk[0]; desk.position.x = edge.position.x = (dk[0] + dk[1]) / 2; deskEnd.position.x = dk[1] - 0.02;
+    const pr = v("prod"), ph = s("prodH");
+    producer.position.set(pr[0], pr[1], pr[2]); producer.scale.set(ph, ph, ph);
+    chair.position.set(pr[0] + 0.01, pr[1] + 0.0, pr[2] + 0.07);
+    chairShade.position.set(pr[0], pr[1] + 0.2, pr[2] + 0.02);
     crate.position.set(...v("crate")); crate.scale.setScalar(s("crateW")); crate.rotation.x = s("crateTilt");
     const M = mpc.position, T = tt.position, C = crt.position;
     cable(cables[0], [[M.x + 0.1, 0.03, M.z - 0.2], [M.x + 0.14, 0.004, M.z - 0.32], [M.x + 0.05, 0.004, -0.5], [C.x - 0.1, 0.004, -0.88], [C.x - 0.2, 0.15, -0.98]]);
@@ -342,7 +417,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   }
 
   // ---------- per-frame: hover easing, pads, screen, record
-  const beat = 60 / 84; // a slow head-nod tempo
+  const beat = 60 / 90; // the head nods at 90 BPM
   const PATTERN = [[0, 12], [2], [1, 6], [2], [0, 9], [2, 14], [1, 6], [3]];
   let lastStep = -1;
   function update(dt, t, state) {
@@ -364,13 +439,31 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     const step = Math.floor(t / (beat / 2));
     if (!reduced && step !== lastStep) {
       lastStep = step;
-      for (const i of PATTERN[step % PATTERN.length]) pads[i].level = 1;
+      for (const i of PATTERN[step % PATTERN.length]) pads[i].level = Math.max(pads[i].level, 0.45);
     }
+    // the producer: breath, nod on the beat, and now and then a reach to the MPC that taps a pad
+    const P = objs.producer;
+    if (!reduced) {
+      prodMat.uniforms.uBreath.value = Math.sin(t * 2 * Math.PI / 4.2);
+      const ph = (t / beat) % 1;
+      const nod = Math.pow(Math.max(0, Math.sin(ph * Math.PI)), 2.5);
+      P.nodAmt = (P.nodAmt ?? 0) + ((P.reach > 0.05 ? 0.4 : 1) - (P.nodAmt ?? 0)) * Math.min(1, dt * 2);
+      prodMat.uniforms.uNod.value = nod * P.nodAmt;
+      if (t > P.nextReach && !state.open) { P.reachT = 0; P.nextReach = t + 9 + Math.random() * 8; P.tapped = false; }
+      if (P.reachT !== undefined) {
+        P.reachT += dt;
+        const u = P.reachT / 3.2;                                  // lean in, tap, settle back
+        P.reach = u < 1 ? Math.sin(Math.PI * Math.min(1, u)) ** 2 : 0;
+        if (!P.tapped && u > 0.45) { P.tapped = true; for (const i of [8, 9, 5].slice(0, 1 + Math.floor(Math.random() * 3))) pads[i].level = 1.6; }
+        if (u >= 1) P.reachT = undefined;
+      }
+      prodMat.uniforms.uLean.value = P.reach;
+    } else { prodMat.uniforms.uBreath.value = 0; prodMat.uniforms.uNod.value = 0; prodMat.uniforms.uLean.value = 0; }
     let padLight = 0;
     for (const p of pads) {
       p.level *= Math.exp(-dt * 5.0);
       const base = reduced ? 0.05 : 0.0;
-      let I = base + p.level * 0.3 + lineOn * 0.06;
+      let I = base + p.level * 0.36 + lineOn * 0.06;
       if (p === padConstruct || p === padVision) {
         const o = p === padConstruct ? objs.construct : objs.vision;
         I = 0.16 + 0.2 * lineOn + o.hover * 1.2 + (reduced ? 0 : 0.08 * Math.sin(t * 1.4 + p.i));
@@ -407,10 +500,11 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   // which way an object faces, for the push-in: flat gear is seen from above
   function normal(id) {
     if (id === "line" || id === "construct" || id === "vision" || id === "quest") return new THREE.Vector3(0, 1, 0.55).normalize();
+    if (id === "producer") return new THREE.Vector3(0.15, 0.35, 1).normalize();
     if (id === "crate") return new THREE.Vector3(0, Math.cos(objs.crate.mesh.rotation.x + Math.PI / 2) * -1, 1).normalize();
     return new THREE.Vector3(0, 0.1, 1).normalize();
   }
-  const size = { orbit: 0.3, quest: 0.24, ruckus: 0.2, line: 0.25, construct: 0.25, vision: 0.25, crate: 0.4 };
+  const size = { orbit: 0.3, quest: 0.24, ruckus: 0.2, line: 0.25, construct: 0.25, vision: 0.25, crate: 0.4, producer: 0.3 };
 
   return { scene, camera, rig, objs, layout, update, corners, center, normal, size, byId };
 }

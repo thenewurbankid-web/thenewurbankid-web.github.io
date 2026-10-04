@@ -1,4 +1,4 @@
-// usage: node qa/shoot-v2.cjs [base] [only]   screenshots of v2 at 375x812 and 1440x900 into qa/v2/
+// usage: node tools/shoot-v2.cjs [base] [only]   screenshots of v2 at 375x812 and 1440x900 into qa/v2/
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const base = process.argv[2] || 'http://localhost:8792/';
 const only = process.argv[3] || '';
@@ -18,12 +18,12 @@ const out = __dirname + '/../qa/v2/';
     await p.screenshot({ path: `${out}${w}-room.png` });
     if (!only.includes('room')) {
       // hover / focus each object (keyboard focus shows the same label + glow)
-      for (const id of ['orbit', 'quest', 'ruckus', 'line', 'crate']) {
+      for (const id of ['producer', 'orbit', 'quest', 'ruckus', 'line', 'crate']) {
         await p.focus(`#hots a[href="#${id}"]`); await p.waitForTimeout(1800);
         await p.screenshot({ path: `${out}${w}-hover-${id}.png` });
       }
       await p.evaluate(() => document.activeElement.blur());
-      for (const id of ['orbit', 'quest', 'ruckus', 'line', 'construct', 'vision']) {
+      for (const id of ['producer', 'orbit', 'quest', 'ruckus', 'line', 'construct', 'vision']) {
         await p.evaluate((id) => window.__studio.open(id), id); await p.waitForTimeout(3600);
         await p.screenshot({ path: `${out}${w}-open-${id}.png` });
         await p.keyboard.press('Escape'); await p.waitForTimeout(2600);

@@ -1,6 +1,6 @@
 // The New Urban Kid, v2: a producer's studio at night. Gear is the projects.
 import * as THREE from "three";
-import { byId } from "./data.js";
+import { byId, OWNER, WORLDS } from "./data.js";
 import { buildRoom } from "./room.js";
 import { Film } from "./post.js";
 import { makeCanvases } from "./paper.js";
@@ -15,6 +15,7 @@ const SET = phone ? "sm" : "lg";
 const body = document.body;
 
 const SPOTS = {
+  producer: { name: "Shashank Penumatcha", where: "At the desk" },
   crate: { name: "The crate", where: "Every record, to flip through" },
   line: { name: "Line framework", where: "The MPC" },
   quest: { name: "A Vibe Called Quest", where: "On the turntable" },
@@ -49,14 +50,14 @@ const film = new Film(renderer, { phone });
 // ------------------------------------------------------------------ assets
 const loader = new THREE.TextureLoader();
 const load = (path, srgb = true) => loader.loadAsync(path).then((t) => { if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t; });
-const names = ["wall", "desk", "cork", "paper", "crt", "mpc", "record", "speaker", "lamp", "window", "crate", "gloves"];
+const names = ["wall", "desk", "cork", "paper", "crt", "mpc", "record", "speaker", "lamp", "window", "crate", "gloves", "producer"];
 const [meta, ...texList] = await Promise.all([
   fetch("assets/room/meta.json").then((r) => r.json()),
   ...names.map((n) => load(`assets/room/${SET}/${n}.webp`)),
   ...["orbit", "quest", "ruckus", "construct"].map((n) => load(`assets/previews/${n}.webp`)),
 ]);
 const tex = Object.fromEntries(names.map((n, i) => [n, texList[i]]));
-const prev = { orbit: texList[12], quest: texList[13], ruckus: texList[14], construct: texList[15] };
+const prev = { orbit: texList[13], quest: texList[14], ruckus: texList[15], construct: texList[16] };
 tex.orbit = prev.orbit;
 const canvases = await makeCanvases({
   cork: tex.cork.image, paper: tex.paper.image, gloves: tex.gloves.image,
@@ -73,7 +74,7 @@ for (const id of Object.keys(SPOTS)) {
   a.className = "hot" + (id === "construct" || id === "vision" ? " pad" : "");
   a.href = `#${id}`;
   const d = byId(id);
-  a.setAttribute("aria-label", id === "crate" ? "The crate of records: browse every project" : `${d.name}, ${SPOTS[id].where.toLowerCase()}: ${d.pitch}`);
+  a.setAttribute("aria-label", id === "crate" ? "The crate of records: browse every project" : id === "producer" ? "About Shashank Penumatcha" : `${d.name}, ${SPOTS[id].where.toLowerCase()}: ${d.pitch}`);
   a.innerHTML = `<span>${SPOTS[id].name}</span>`;
   a.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") setHover(id); });
   a.addEventListener("pointerleave", () => setHover(null));
@@ -119,7 +120,23 @@ function placeHots() {
 
 // ------------------------------------------------------------------ the panel
 const panel = $("panel");
+function fillAbout() {
+  $("p-kicker").textContent = "At the desk";
+  $("p-name").textContent = OWNER.person;
+  $("p-pitch").textContent = `${OWNER.name}. ${OWNER.line}`;
+  $("p-facts").replaceChildren(Object.assign(document.createElement("li"), { textContent: OWNER.summary }));
+  $("p-tags").textContent = "";
+  const pads = $("p-pads"); pads.replaceChildren();
+  for (const w of WORLDS) {
+    const a = Object.assign(document.createElement("a"), { href: `#${w.id}`, textContent: w.name });
+    a.style.setProperty("--pad-c", "#d8d0c4");
+    a.addEventListener("click", (e) => { e.preventDefault(); navigate(w.id, true); });
+    pads.appendChild(a);
+  }
+  $("p-links").replaceChildren(Object.assign(document.createElement("a"), { href: OWNER.github, target: "_blank", rel: "noopener", textContent: "GitHub" }));
+}
 function fillPanel(id) {
+  if (id === "producer") return fillAbout();
   const d = byId(id);
   $("p-kicker").textContent = SPOTS[id].where;
   $("p-name").textContent = d.name;
@@ -246,7 +263,7 @@ function back() {
 }
 addEventListener("popstate", () => {
   const id = location.hash.slice(1);
-  if (id && (byId(id) || id === "crate")) open(id); else close();
+  if (id && (byId(id) || id === "crate" || id === "producer")) open(id); else close();
 });
 addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); back(); } });
 $("scene").addEventListener("click", () => { if (state.open) back(); });
@@ -351,7 +368,7 @@ hint.textContent = coarse ? "Tilt to look · tap the gear" : "Move to look · cl
 setTimeout(() => hint.classList.add("on"), reduced ? 300 : 3200);
 setTimeout(() => hint.classList.remove("on"), 11000);
 const start = location.hash.slice(1);
-if (start && (byId(start) || start === "crate")) {
+if (start && (byId(start) || start === "crate" || start === "producer")) {
   history.replaceState(null, "", location.pathname + location.search); history.pushState({ id: start }, "", `#${start}`);
   setTimeout(() => open(start), reduced ? 0 : 900);
 }
