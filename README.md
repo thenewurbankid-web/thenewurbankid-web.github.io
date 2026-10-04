@@ -1,47 +1,51 @@
 # The New Urban Kid
 
-A portfolio of The New Urban Kid's projects, shown as worlds in one star system. It is a single WebGL
-scene (three.js 0.170.0 from jsDelivr) with plain HTML text laid over it, so the type stays sharp.
+The portfolio of The New Urban Kid, Shashank Penumatcha.
 
-- **Orbit**: dark teal ocean world with a ring
-- **A Vibe Called Quest**: violet-grey rocky world with icy poles
-- **Bring The Ruckus**: rust and ember desert world (its text uses Sedgwick Ave Display)
-- **Line framework**: ice giant with two moons, **Construct** and **Vision**
-- **The star**: a short line about The New Urban Kid and a link to the GitHub profile
+**v2** (the site root) is a hip-hop producer's home studio at night, seen first person. It is built from real
+photos on planes and simple boxes at real depths in one WebGL scene (three.js 0.170.0 from jsDelivr), lit only by
+the practical lights: the desk lamp, the glow of the CRT, the MPC pads and two red LEDs. Each piece of gear is a project:
+
+- **Orbit**: the CRT, glowing with the Orbit space scene
+- **A Vibe Called Quest**: the record on the turntable; it spins up when you hover or open it
+- **Bring The Ruckus**: the flyer on the wall
+- **Line framework**: the MPC. Two of its pads are **Construct** (warm) and **Vision** (cyan)
+- **The crate** on the floor: flip through one record per project, with liner notes on the back. It is also the
+  plain list of everything, and what you get if WebGL is not available
+
+**v1** (`v1/`) is the earlier solar-system site, kept as it was apart from the owner's name under the title and
+one typeface for every project. The small "v1 / v2" switch in the top right corner links between them.
 
 ## Run it
 
 It is a static site: no build step and no npm dependencies. Serve the folder with any static server:
 
 ```bash
-npx serve .            # or: python3 -m http.server 8080
+python3 -m http.server 8080   # then open http://localhost:8080/ (v2) or /v1/
 ```
 
 Opening `index.html` straight from disk will not work, because browsers block ES modules on `file://`.
 
 ## Using it
 
-- Drag or swipe to orbit the system. Tap a world to fly to it. Double-tap, pinch in or press Esc to go back.
-- Arrow keys cycle the worlds. Enter flies to the selected world, or opens the live site when you are at one.
-- `?list` (or a long press on the top-left corner) shows a plain list of every project with links. The same
-  list is always in the page for screen readers.
-- Phones: the Tilt glyph (top right) turns on gyroscope parallax. iOS asks for permission first.
-- Deep links: `#orbit`, `#quest`, `#ruckus`, `#line`, `#construct`, `#vision`, `#about`.
-- `?q=high|mid|low` forces a quality tier. By default, desktops get high, phones get mid (2x pixel ratio and
-  bloom), and weak or software GPUs get low (1x, no bloom). If the first seconds run slow, it steps down on its own.
-- `prefers-reduced-motion` skips the fly-in, the letter animation, the parallax and the lightning.
+- Move the mouse to look around. On phones, tilt (iOS asks for permission when you tap "tilt").
+- Hover, or Tab to, a piece of gear: it glows and a small label names it. Click, tap or Enter pushes the camera in,
+  with a lens blur, and the project fades in over the photo. Escape, the back gesture or a tap outside goes back.
+- Deep links: `#orbit`, `#quest`, `#ruckus`, `#line`, `#construct`, `#vision`, `#crate`.
+- In the crate: swipe, scroll or the arrow keys flip records; tap or Enter turns the sleeve over.
+- "sound" (bottom right) plays a quiet synthesised vinyl crackle and room hum. It is off until you turn it on.
+- `prefers-reduced-motion`: no parallax, no camera moves (the panel crossfades in), no spinning, static grain.
 
 ## Files
 
-- `index.html`, `style.css`: overlays, the plain list, fonts (Google Fonts)
-- `js/data.js`: every project's text and links. Facts come from each project's README, HANDOFF or live site.
-- `js/main.js`: scene, camera, gestures, overlays
-- `js/shaders.js`: planet, ring, sun, star, nebula and post-processing shaders. Planet surfaces and the nebula
-  are baked once into textures at load, so each frame only does the lighting.
-- `assets/*.webp`: preview images (screenshots of the live sites and the game's own QA captures)
-- `qa/`: screenshots from the last test run at 375x812 and 1440x900
-
-## When the Vision status page goes live
-
-The Vision moon shows "Status page coming" because https://thenewurbankid-web.github.io/construct/vision/
-returned 404 on 2026-10-04. Once it is published, set `live: true` on that link in `js/data.js`.
+- `index.html`, `style.css`: the page, the panel, the crate and the corners
+- `js/data.js`: every project's text and links. Facts come from each project's README, HANDOFF or live site
+- `js/room.js`: the studio scene, its layout for portrait and landscape, lights, pads, record and CRT shaders
+- `js/post.js`: the film look: depth of field, bloom with a warm halation, grade, grain, vignette, light leak
+- `js/paper.js`: the cork board polaroids, the credit card, the flyer and the record label, drawn in Jost
+- `js/crate.js`, `js/sound.js`, `js/main.js`: the crate, the optional sound, camera and interaction
+- `assets/room/{lg,sm}/`: textures for desktops and phones (phones load `sm`, at most 1024 px)
+- `assets/CREDITS.md`: source, author, licence and edits for every photo and texture
+- `tools/build_assets.py`: makes `assets/room/` from the source photos (Pillow, numpy, scipy)
+- `tools/shoot-v2.cjs`, `tools/shoot-v1.cjs`: Playwright screenshots into `qa/` (kept local)
+- `v1/`: the solar-system site
