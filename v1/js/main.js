@@ -119,6 +119,14 @@ async function start() {
   })();
   const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: coronaTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.28 }));
   corona.scale.setScalar(SUN_R * 3.2); scene.add(corona);
+  if (!Q.bloom) {   // the low tier renders without bloom: a soft glow sprite stands in for it so the sun still shines
+    const gc = document.createElement("canvas"); gc.width = gc.height = 256; const gx = gc.getContext("2d");
+    const gg = gx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gg.addColorStop(0, "rgba(255,236,210,1)"); gg.addColorStop(0.3, "rgba(255,226,190,.5)"); gg.addColorStop(0.55, "rgba(255,210,160,.14)"); gg.addColorStop(1, "rgba(0,0,0,0)");
+    gx.fillStyle = gg; gx.fillRect(0, 0, 256, 256); const gt = new THREE.CanvasTexture(gc); gt.colorSpace = THREE.SRGBColorSpace;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: gt, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
+    halo.scale.setScalar(SUN_R * 6); scene.add(halo);
+  }
 
   // ---------------------------------------------------------------- worlds
   const LOOKS = {
@@ -229,7 +237,7 @@ async function start() {
   composer.addPass(post);
 
   // ---------------------------------------------------------------- sizing
-  let W = 1, H = 1, portrait = false, wide = false;
+  let W = 1, H = 1, portrait = false, wide = false, bloomScale = 1;
   function resize() {
     W = innerWidth; H = innerHeight; portrait = H > W; wide = W >= 900 && W / H >= 1.25;
     renderer.setPixelRatio(dpr); renderer.setSize(W, H, false);
@@ -237,7 +245,7 @@ async function start() {
     camera.aspect = W / H; camera.fov = portrait ? 50 : 40; camera.updateProjectionMatrix();
     starUniforms.uPx.value = dpr;
     post.uniforms.uRes.value.set(W * dpr, H * dpr);
-    bloom.resolution.set(W * dpr * 0.5, H * dpr * 0.5);
+    bloom.resolution.set(W * dpr * 0.5 * bloomScale, H * dpr * 0.5 * bloomScale);
   }
   addEventListener("resize", resize); resize();
 
@@ -576,7 +584,9 @@ async function start() {
   // ---------------------------------------------------------------- frame loop
   const screenFade = { v: 0, target: 0 };
   const clock = new THREE.Clock();
-  let time = 0, frames = 0, slow = 0, checkAt = 3;
+  let time = 0, frames = 0, slow = 0, checkAt = 3, slowWindows = 0;
+  const ADAPT_UNTIL = 15;
+  addEventListener("visibilitychange", () => { frames = 0; slow = 0; slowWindows = 0; checkAt = time + 3; });
   function placeScreen(dt) {
     screenFade.v += (screenFade.target - screenFade.v) * (1 - Math.exp(-dt * 3));
     screenMat.uniforms.uOpacity.value = screenFade.v; screen.visible = screenFade.v > 0.01;
@@ -627,13 +637,39 @@ async function start() {
     }
     for (const p of placed) p.el.style.transform = `translate(${p.x}px, ${p.y}px)`;
   }
+  // ---------------------------------------------------------------- glow probe (tests only: window.__tnuk.probe.on = true)
+  const probe = { on: false, samples: [], px: new Uint8Array(4) };
+  function sampleSun() {
+    const s = screenOf(sun, SUN_R); if (!s.front) return;
+    const lum = (x, y) => {
+      const X = Math.round(x * dpr), Y = Math.round((H - y) * dpr);
+      if (X < 0 || Y < 0 || X >= W * dpr || Y >= H * dpr) return null;
+      gl.readPixels(X, Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, probe.px);
+      return (probe.px[0] * 0.2126 + probe.px[1] * 0.7152 + probe.px[2] * 0.0722) / 255;
+    };
+    const ring = [];
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2, v = lum(s.x + Math.cos(a) * s.r * 1.45, s.y + Math.sin(a) * s.r * 1.45); if (v != null) ring.push(v); }
+    if (ring.length < 6) return;
+    ring.sort((a, b) => a - b);
+    probe.samples.push({ t: +time.toFixed(2), halo: ring[Math.floor(ring.length / 2)], core: lum(s.x, s.y), r: s.r, bloom: bloom.enabled, dpr, mode: view.mode });
+    if (probe.samples.length > 20000) probe.samples.shift();
+  }
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.05); time += dt;
-    // adaptive quality: if the first seconds run slow, step down
-    frames++; if (dt > 0.022) slow++;
-    if (time > checkAt) {
-      if (slow / frames > 0.5) { if (dpr > 1) { dpr = Math.max(1, dpr * 0.75); resize(); } else if (bloom.enabled) bloom.enabled = false; }
-      frames = 0; slow = 0; checkAt = time + 3;
+    // adaptive quality: only in the first seconds, only while the page is visible, and only after two slow
+    // windows in a row. It may lower the pixel ratio and the bloom resolution, but it never turns the bloom off:
+    // the sun's glow is the bloom, and a busy moment later on (a tab switch, a slow stretch) used to kill it for good.
+    if (time < ADAPT_UNTIL && !document.hidden) {
+      frames++; if (dt > 0.022) slow++;
+      if (time > checkAt) {
+        slowWindows = frames > 20 && slow / frames > 0.5 ? slowWindows + 1 : 0;
+        if (slowWindows >= 2) {
+          slowWindows = 0;
+          if (dpr > 1) { dpr = Math.max(1, dpr * 0.75); resize(); }
+          else if (bloomScale > 0.25) { bloomScale *= 0.5; resize(); }
+        }
+        frames = 0; slow = 0; checkAt = time + 3;
+      }
     }
     par.x += (par.tx - par.x) * (1 - Math.exp(-dt * 2.5)); par.y += (par.ty - par.y) * (1 - Math.exp(-dt * 2.5));
     if (reduced) { par.x = par.y = 0; }
@@ -665,8 +701,9 @@ async function start() {
     if (visionDraw && view.focus === "vision") visionDraw(time);
     placeScreen(dt); placeLabels();
     composer.render(dt);
+    if (probe.on) sampleSun();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__tnuk = { get tier() { return tier; }, get dpr() { return dpr; }, gpu, openBody, back, openAbout, view, cam };
+  window.__tnuk = { get tier() { return tier; }, get dpr() { return dpr; }, gpu, openBody, back, openAbout, view, cam, probe, get bloom() { return bloom.enabled; }, get bloomScale() { return bloomScale; } };
 }

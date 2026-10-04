@@ -471,6 +471,7 @@ resize();
 if (!reduced) camState.pos.add(new THREE.Vector3(0, 0.12, 0.55)); // the intro: drift in slowly from the doorway
 
 // ------------------------------------------------------------------ frame loop
+const glowProbe = { want: null };
 let fpsT = 0, fpsN = 0, checked = false, prodFade = 1;
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
@@ -527,6 +528,18 @@ function frame() {
   }
   placeHots();
   film.render(scene, camera);
+  if (glowProbe.want) {             // tests: read the light around the lamp, the CRT and a pad straight after the frame
+    const gl = renderer.getContext(), px = new Uint8Array(4), out = {};
+    for (const [k, p] of Object.entries(room.glowPoints())) {
+      v3.copy(p).project(camera); let sum = 0, n = 0;
+      for (const [dx, dy] of [[0, 0], [6, 0], [-6, 0], [0, 6], [0, -6]]) {
+        const X = Math.round(((v3.x * 0.5 + 0.5) * innerWidth + dx) * dpr), Y = Math.round(((v3.y * 0.5 + 0.5) * innerHeight + dy) * dpr);
+        gl.readPixels(X, Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); sum += (px[0] * 0.2126 + px[1] * 0.7152 + px[2] * 0.0722) / 255; n++;
+      }
+      out[k] = sum / n;
+    }
+    glowProbe.want(out); glowProbe.want = null;
+  }
   // step down on slow phones after the first seconds
   if (!checked) {
     fpsT += dt; fpsN++;
@@ -547,4 +560,4 @@ if (start && (byId(start) || start === "crate" || start === "producer")) {
   history.replaceState(null, "", location.pathname + location.search); history.pushState({ id: start }, "", `#${start}`);
   setTimeout(() => open(start), reduced ? 0 : 900);
 }
-window.__studio = { state, open: navigate, back, camState, look, peek, occlusion: (id) => occlusion(state.open && (id === "construct" || id === "vision") ? "line" : id, { pos: camera.position.clone(), look: camState.look.clone(), fov: camera.fov }), get producerFade() { return prodFade; }, song };
+window.__studio = { glow: () => new Promise((r) => { glowProbe.want = r; }), state, open: navigate, back, camState, look, peek, occlusion: (id) => occlusion(state.open && (id === "construct" || id === "vision") ? "line" : id, { pos: camera.position.clone(), look: camState.look.clone(), fov: camera.fov }), get producerFade() { return prodFade; }, song };

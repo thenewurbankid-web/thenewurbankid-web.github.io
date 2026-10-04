@@ -570,5 +570,6 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
   const size = { orbit: 0.3, quest: 0.24, ruckus: 0.2, line: 0.25, construct: 0.25, vision: 0.25, crate: 0.4, producer: 0.3, cassette: 0.07, boombox: 0.22 };
   const song = { boom, boomMat, cas, casHome, doorLocal, CW };
 
-  return { scene, camera, rig, objs, layout, update, corners, center, normal, size, byId, song };
+  const glowPoints = () => ({ lamp: bulb.position.clone(), crt: center("orbit", new THREE.Vector3()), pads: objs.line.pads[0].mesh.getWorldPosition(new THREE.Vector3()) });
+  return { scene, camera, rig, objs, layout, update, corners, center, normal, size, byId, song, glowPoints };
 }
