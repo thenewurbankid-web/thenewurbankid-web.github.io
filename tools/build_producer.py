@@ -1,52 +1,72 @@
 """Builds the producer cut-out (assets/room/{lg,sm}/producer.webp) from the source photo.
 
-Usage: python3 tools/build_producer.py <raw_dir>   (<raw_dir>/producer.jpg is the Commons original, 3840 px wide)
+Usage: python3 tools/build_producer.py   (reads assets/src/pexels-18708554.jpeg, which is not committed)
 Needs Pillow, numpy, scipy and rembg (isnet-general-use model). Source and licence: assets/CREDITS.md.
-Edits: matte with rembg + alpha matting; the backpack hidden by mirroring the left half of the back onto the
-right below the collar; the jacket darkened to black with its quilting softened; the two sleeve badges blurred.
+Edits: the white script on the cap and the logo on the back of the shirt painted out to plain black, keeping the
+fabric texture; the gold chain toned down; matte with rembg + alpha matting; cropped; resized.
 """
-import sys, os, json
+import os, json
 import numpy as np
 from PIL import Image
 from scipy import ndimage
 from rembg import remove, new_session
 
-RAW = sys.argv[1]
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "room")
-src = Image.open(f"{RAW}/producer.jpg").convert("RGB")
-crop = src.crop((1900, 500, 3840, 2497))
-cut = remove(crop, session=new_session("isnet-general-use"), alpha_matting=True,
-             alpha_matting_foreground_threshold=240, alpha_matting_background_threshold=12, alpha_matting_erode_size=8)
-im = np.asarray(cut.convert("RGBA")).astype(np.float32)
-H, W = im.shape[:2]
-k = W / 680                       # measurements below were taken on a 680 px wide preview
-spine = int(245 * k)
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(HERE, "..", "assets", "room")
+src = Image.open(os.path.join(HERE, "..", "assets", "src", "pexels-18708554.jpeg")).convert("RGB")
+a = np.asarray(src).astype(np.float32)
+H, W = a.shape[:2]
+L = a.mean(axis=2)
+# matte first, on the untouched photo, so the paint-out can stay inside the person
+matte = remove(src, session=new_session("isnet-general-use"), alpha_matting=True, alpha_matting_foreground_threshold=240,
+               alpha_matting_background_threshold=15, alpha_matting_erode_size=10)
+alpha = np.asarray(matte)[..., 3].astype(np.float32)
+inside = ndimage.binary_erosion(alpha > 128, iterations=3)
 yy, xx = np.mgrid[0:H, 0:W]
-mir = im[yy, np.clip(2 * spine - xx, 0, W - 1)]
-m = np.clip((xx - (spine + 30 * k)) / (25 * k), 0, 1) * np.clip((yy - 318 * k) / (30 * k), 0, 1)
-m = np.maximum(m, np.clip((xx - (spine + 95 * k)) / (20 * k), 0, 1) * np.clip((yy - 285 * k) / (20 * k), 0, 1))
-o = im * (1 - m[..., None]) + mir * m[..., None]
-rgb, a = o[..., :3], o[..., 3]
-r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-skin = ndimage.gaussian_filter((((r - b) > 14) & (r > g) & (yy < 330 * k)).astype(np.float32), 4 * k)
-jacket = np.clip((yy - 255 * k) / (10 * k), 0, 1) * (1 - np.clip(skin * 2, 0, 1))
-L = rgb.mean(axis=2)
-low = ndimage.gaussian_filter(L, 7 * k)
-newL = np.clip(low * 0.42 + (L - low) * 0.2, 0, 255)
-cool = np.stack([newL * 0.96, newL * 0.97, newL * 1.02], -1)
-rgb = rgb * (1 - jacket[..., None]) + cool * jacket[..., None]
-for cx in (int(68 * k), 2 * spine - int(68 * k)):
-    cy, r0 = int(588 * k), int(22 * k)
-    d = np.exp(-(((xx - cx) / r0) ** 2 + ((yy - cy) / (r0 * 0.6)) ** 2))[..., None]
-    rgb = rgb * (1 - d) + ndimage.gaussian_filter(rgb, (10 * k, 10 * k, 0)) * d
-out = Image.fromarray(np.dstack([rgb, a]).clip(0, 255).astype(np.uint8), "RGBA")
-x0, y0, x1, y1 = out.getbbox()
-out = out.crop((x0, 0, x1, H))
-for sub, size in (("lg", 1100), ("sm", 760)):
-    o2 = out.copy(); o2.thumbnail((size, size), Image.LANCZOS)
-    o2.save(os.path.join(ROOT, sub, "producer.webp"), "WEBP", quality=82, method=6)
+
+def paint_out(box, thresh, shift):
+    """Fill bright marks inside box with the surrounding dark fabric, then put back texture from `shift` away."""
+    global a
+    x0, y0, x1, y1 = box
+    inbox = (xx >= x0) & (xx < x1) & (yy >= y0) & (yy < y1)
+    m = inbox & (L > thresh) & inside
+    m = ndimage.binary_dilation(m, iterations=9)
+    mf = ndimage.gaussian_filter(m.astype(np.float32), 2.0)
+    keep = (1 - m.astype(np.float32))[..., None]
+    fill = ndimage.gaussian_filter(a * keep, (18, 18, 0)) / np.maximum(ndimage.gaussian_filter(keep, (18, 18, 0)), 1e-3)
+    ring = ndimage.binary_dilation(m, iterations=30) & ~ndimage.binary_dilation(m, iterations=10) & inside
+    fill = np.minimum(fill, a[ring].mean(axis=0) * 1.02)      # no halo from the old print
+    dx, dy = shift
+    donor = np.roll(np.roll(a, dy, axis=0), dx, axis=1)
+    tex = donor - ndimage.gaussian_filter(donor, (6, 6, 0))
+    mf *= inside
+    a = a * (1 - mf[..., None]) + (fill + tex) * mf[..., None]
+
+paint_out((930, 540, 1380, 740), 70, (0, -170))      # "high fashion" on the cap (corduroy above it as donor)
+paint_out((990, 1380, 1290, 1700), 60, (-330, 0))    # "hf" on the back of the shirt
+# the last letter sits on the cap's edge: darken whatever light is left there, inside the matte
+edge = (xx > 1300) & (xx < 1385) & (yy > 560) & (yy < 720) & (alpha > 20) & (a.mean(axis=2) > 45)
+em = ndimage.gaussian_filter(ndimage.binary_dilation(edge, iterations=3).astype(np.float32), 1.5)[..., None]
+a = a * (1 - em) + np.array([14, 15, 20], np.float32) * em
+# the chain: keep it, but take the glare down
+r, g, b = a[..., 0], a[..., 1], a[..., 2]
+chain = (yy > 1140) & (yy < 1225) & (xx > 870) & (xx < 1350) & (r > b + 18) & (r + g + b > 200)
+cm = ndimage.gaussian_filter(ndimage.binary_dilation(chain, iterations=2).astype(np.float32), 1.5)[..., None]
+a = a * (1 - cm * 0.45)
+# decontaminate the edges: the wall behind him was light, so pull edge colour in from the opaque interior
+inner = (alpha > 250).astype(np.float32)[..., None]
+ext = ndimage.gaussian_filter(a * inner, (6, 6, 0)) / np.maximum(ndimage.gaussian_filter(inner, (6, 6, 0)), 1e-3)
+edge_w = np.clip((250 - alpha) / 120, 0, 1)[..., None] * (ndimage.gaussian_filter(inner, (6, 6, 0)) > 0.02)
+a = a * (1 - edge_w) + ext * edge_w
+cut = Image.fromarray(np.dstack([np.clip(a, 0, 255), alpha]).astype(np.uint8), "RGBA").crop((0, 120, W, H))
+bx0, by0, bx1, by1 = cut.getbbox()
+cut = cut.crop((bx0, by0, bx1, cut.height))
+for sub, size in (("lg", 1100), ("sm", 800)):
+    o = cut.copy(); o.thumbnail((size, size), Image.LANCZOS)
+    o.save(os.path.join(ROOT, sub, "producer.webp"), "WEBP", quality=82, method=6)
+ch = cut.height
 meta_p = os.path.join(ROOT, "meta.json"); meta = json.load(open(meta_p))
-meta["producer"] = {"neckV": round(1 - 262 * k / H, 4), "spineU": round((spine - x0) / (x1 - x0), 4),
-                    "headTopV": round(1 - 40 * k / H, 4), "aspect": round((x1 - x0) / H, 4)}
+# neck line: where the collar is, about y=1215 in the source
+meta["producer"] = {"neckV": round(1 - (1215 - 120 - by0) / ch, 4), "aspect": round(cut.width / ch, 4)}
 json.dump(meta, open(meta_p, "w"), indent=1)
-print(meta["producer"], out.size)
+print(meta["producer"], cut.size)
