@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The New Urban Kid — Shashank Penumatcha</title>
+<meta name="description" content="The New Urban Kid, Shashank Penumatcha: games, tools and AI agent systems, laid out in a producer's studio at night.">
+<meta name="author" content="Shashank Penumatcha">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&family=Jost:ital,wght@0,200;0,300;0,400;1,300&display=swap">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div id="veil" aria-hidden="true"></div>
+
+<header id="credit">
+  <h1>The New Urban Kid <span class="dot" aria-hidden="true">·</span> <span class="person">Shashank Penumatcha</span></h1>
+</header>
+<nav id="ver" aria-label="Site version"><a href="v1/">v1</a> <span aria-hidden="true">/</span> <span aria-current="page">v2</span></nav>
+
+<main id="room" aria-label="The studio. Each piece of gear is a project.">
+  <div id="hots"></div>
+  <p id="tag" aria-hidden="true"></p>
+  <p id="hint" class="mono" aria-hidden="true"></p>
+</main>
+
+<section id="panel" aria-live="polite" aria-labelledby="p-name" hidden>
+  <p class="kicker mono" id="p-kicker"></p>
+  <h2 id="p-name"></h2>
+  <p id="p-pitch"></p>
+  <ul id="p-facts"></ul>
+  <p id="p-tags" class="mono"></p>
+  <p id="p-pads"></p>
+  <p id="p-links"></p>
+  <a id="p-back" class="mono" href="#">back to the room</a>
+</section>
+
+<section id="crate" aria-labelledby="crate-title" hidden>
+  <h2 id="crate-title" class="kicker mono">The crate<span class="long"> · every project, one record each</span></h2>
+  <ol id="records"></ol>
+  <p id="crate-hint" class="mono" aria-hidden="true"></p>
+  <a id="crate-back" class="mono" href="#">back to the room</a>
+</section>
+
+<p id="toggles" class="mono">
+  <a id="tilt" href="#" role="button" hidden>tilt off</a>
+  <a id="sound" href="#" role="button" aria-pressed="false">sound off</a>
+</p>
+
+<noscript>
+  <nav class="plain" aria-label="Projects">
+    <h2>Projects</h2>
+    <ul>
+      <li><a href="https://thenewurbankid-web.github.io/orbit/">Orbit</a>: a live mission-control view of Paperclip AI companies, drawn as a realistic space scene.</li>
+      <li><a href="https://thenewurbankid-web.github.io/claude_quest/">A Vibe Called Quest</a>: a cozy 3D quest world where your AI work becomes quests.</li>
+      <li><a href="https://thenewurbankid-web.github.io/bring-the-ruckus/">Bring The Ruckus</a>: a photoreal hip-hop street-boxing game, built phone first.</li>
+      <li><a href="https://thenewurbankid-web.github.io/construct/">Line framework</a> and <a href="https://thenewurbankid-web.github.io/construct/">Construct</a>; <a href="https://thenewurbankid-web.github.io/construct/next/vision/">Vision status</a>.</li>
+    </ul>
+  </nav>
+</noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
