@@ -216,3 +216,11 @@ body.open #toggles, body.browse #toggles { opacity: .5; }
   outline: 1px solid rgba(255,255,255,.6); outline-offset: 4px;
 }
 .rec[aria-current="true"] .sleeve:focus-within, #records:focus-visible .rec[aria-current="true"] .side { box-shadow: 0 0 0 1px rgba(255,255,255,.45), 0 30px 60px rgba(0,0,0,.7); }
+
+/* GitHub and LinkedIn, quietly under the credit (wide screens; on phones they live in the About panel) */
+#social { position: fixed; left: var(--pad); top: calc(var(--top) + 20px); z-index: 5; margin: 0; font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--faint); }
+#social a { color: var(--faint); text-decoration: none; padding: 6px 0; transition: color .4s; }
+#social a:hover, #social a:focus-visible { color: var(--ink); }
+#social a:focus-visible { outline: 1px solid rgba(255,255,255,.6); outline-offset: 4px; }
+@media (max-width: 899px) { #social { display: none; } }
+body.open #social, body.browse #social { opacity: .4; }

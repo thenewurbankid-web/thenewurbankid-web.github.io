@@ -47,6 +47,7 @@ const keys = makeKeys({
   ],
   enabled: () => !body.classList.contains("open") && !body.classList.contains("browse"),
 });
+{ const s = $("social"); s.querySelector('[data-k="github"]').href = OWNER.github; s.querySelector('[data-k="linkedin"]').href = OWNER.linkedin; }
 $("keys-btn").addEventListener("click", (e) => { e.preventDefault(); keys.toggle(); });
 $("skip").addEventListener("click", (e) => { e.preventDefault(); if (typeof navigate === "function" && window.__studio) navigate("crate"); else crate.open(); });
 
@@ -168,7 +169,9 @@ function fillAbout() {
     a.addEventListener("click", (e) => { e.preventDefault(); navigate(w.id, true); });
     pads.appendChild(a);
   }
-  $("p-links").replaceChildren(Object.assign(document.createElement("a"), { href: OWNER.github, target: "_blank", rel: "noopener", textContent: "GitHub" }));
+  $("p-links").replaceChildren(
+    Object.assign(document.createElement("a"), { href: OWNER.github, target: "_blank", rel: "noopener noreferrer", textContent: "GitHub" }),
+    Object.assign(document.createElement("a"), { href: OWNER.linkedin, target: "_blank", rel: "noopener noreferrer", textContent: "LinkedIn" }));
 }
 function fillPanel(id) {
   if (id === "producer") return fillAbout();

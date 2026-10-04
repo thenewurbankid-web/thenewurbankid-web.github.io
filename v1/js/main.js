@@ -346,6 +346,7 @@ async function start() {
     Status: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M6 13h3l2-4 2.5 7 2-3H18"/></svg>',
     Moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke-dasharray="2 3"/><circle cx="12" cy="12" r="3.2"/></svg>',
     GitHub: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9 18v-2.5c0-1 .3-1.6.8-2-2.3-.3-3.8-1.3-3.8-3.7 0-.9.3-1.7.9-2.3-.1-.4-.3-1.3.1-2.4 0 0 .8-.2 2.4.9a8 8 0 014.2 0c1.6-1.1 2.4-.9 2.4-.9.4 1.1.2 2 .1 2.4.6.6.9 1.4.9 2.3 0 2.4-1.5 3.4-3.8 3.7.5.4.8 1.1.8 2.1V18"/></svg>',
+    LinkedIn: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M8.5 10.5v5.5M8.5 7.8v.2M11.5 16v-5.5M11.5 13c0-1.6 1-2.6 2.2-2.6 1.3 0 1.8.9 1.8 2.4V16"/></svg>',
   };
   function glyphLink(link) {
     const a = document.createElement("a"); a.className = "glyph"; a.href = link.href; a.target = "_blank"; a.rel = "noopener";
@@ -378,6 +379,7 @@ async function start() {
   function hidePanels() { panel.classList.remove("in"); about.classList.remove("in"); setTimeout(() => { if (!panel.classList.contains("in")) panel.hidden = true; if (!about.classList.contains("in")) about.hidden = true; }, 400); }
   $("about-line").textContent = OWNER.line;
   const gh = $("about-gh"); gh.href = OWNER.github; gh.innerHTML = ICON.GitHub + "<span>GitHub</span>";
+  const li = $("about-li"); li.href = OWNER.linkedin; li.innerHTML = ICON.LinkedIn + "<span>LinkedIn</span>";
 
   // ---------------------------------------------------------------- navigation
   const order = WORLDS.map((w) => w.id);
@@ -395,7 +397,7 @@ async function start() {
   function openAbout() {
     dismissIntro(); flyTo("about", null, 2.0); screenFade.target = 0;
     panel.classList.remove("in"); panel.hidden = true; about.hidden = false; requestAnimationFrame(() => requestAnimationFrame(() => about.classList.add("in")));
-    title.classList.add("away"); history.replaceState(null, "", "#about");
+    title.classList.add("away"); hint.classList.remove("on"); history.replaceState(null, "", "#about");
     if (kbd) { about.tabIndex = -1; requestAnimationFrame(() => about.focus({ preventScroll: true })); }
   }
   function back() {

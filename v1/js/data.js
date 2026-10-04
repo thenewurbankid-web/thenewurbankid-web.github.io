@@ -5,6 +5,7 @@ export const OWNER = {
   person: "Shashank Penumatcha",
   line: "Builder of games, tools and AI agent systems.",
   github: "https://github.com/thenewurbankid-web",
+  linkedin: "https://www.linkedin.com/in/shashankpenumatcha/",
 };
 
 export const WORLDS = [

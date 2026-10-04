@@ -7,6 +7,7 @@ export const OWNER = {
   // What the projects on this site show, in one line (each part is backed by a project below).
   summary: "Games, a realtime status board for AI agents, a front-end framework, and a pipeline that turns web pages into components.",
   github: "https://github.com/thenewurbankid-web",
+  linkedin: "https://www.linkedin.com/in/shashankpenumatcha/",
 };
 
 export const WORLDS = [
