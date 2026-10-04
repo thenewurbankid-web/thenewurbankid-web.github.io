@@ -6,7 +6,6 @@
   --glow: 0 0 10px rgba(220, 235, 255, 0.35);
   --thin: "Jost", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
-  --graffiti: "Sedgwick Ave Display", "Jost", sans-serif;
   --pad: max(18px, env(safe-area-inset-left));
 }
 * { box-sizing: border-box; }
@@ -32,6 +31,12 @@ a { color: inherit; }
   transition: opacity 1.1s ease, filter 1.3s cubic-bezier(.2,.7,.2,1), transform 1.3s cubic-bezier(.2,.7,.2,1);
 }
 #title.in .ch { opacity: 1; filter: blur(0); transform: none; }
+/* the owner's name, under the title in the same face */
+#title .by {
+  display: block; margin-top: 0.9em; font-size: 0.26em; font-weight: 300; letter-spacing: 0.42em; text-indent: 0.42em; color: rgba(242,244,246,.72);
+  opacity: 0; filter: blur(8px); transition: opacity 1.4s ease 1.6s, filter 1.6s ease 1.6s;
+}
+#title.in .by { opacity: 1; filter: blur(0); }
 #title.pulse { animation: pulse 6s ease-in-out infinite; }
 @keyframes pulse {
   0%, 100% { text-shadow: 0 0 6px rgba(235,242,255,.35), 0 0 18px rgba(200,220,255,.12); }
@@ -43,6 +48,7 @@ a { color: inherit; }
   #title { font-size: 10.4vw; letter-spacing: 0.17em; text-indent: 0.17em; line-height: 1.2; white-space: normal; }
   #title .w { display: block; }
   #title.docked { transform: translateY(0) scale(0.36); }
+  #title .by { font-size: 0.5em; letter-spacing: 0.2em; text-indent: 0.2em; margin-top: 0.7em; }
 }
 
 #hint {
@@ -64,7 +70,6 @@ a { color: inherit; }
 .lbl.on { opacity: 1; pointer-events: auto; }
 .lbl.sel, .lbl:hover, .lbl:focus-visible { color: #fff; text-shadow: var(--glow); outline: none; }
 .lbl.sel::before, .lbl:hover::before { width: 28px; background: rgba(255,255,255,.6); }
-.lbl.graffiti { font: 400 15px/1 var(--graffiti); letter-spacing: 0.06em; text-transform: none; }
 
 /* ---- panels ---- */
 #panel, #about {
@@ -115,11 +120,6 @@ a { color: inherit; }
 .glyph.back:hover svg { transform: translateX(-3px); }
 .note { font: 400 10px/1 var(--mono); letter-spacing: .24em; text-transform: uppercase; color: var(--faint); align-self: center; }
 
-/* graffiti face for Bring The Ruckus: white on black */
-.graffiti h2#p-name { font: 400 clamp(34px, 10vw, 60px)/1.05 var(--graffiti); letter-spacing: 0.02em; text-shadow: 0 0 10px rgba(255,255,255,.18); }
-.graffiti .kicker, .graffiti .tag, .graffiti #p-links .glyph { font-family: var(--graffiti); font-size: 14px; letter-spacing: 0.06em; text-transform: none; }
-.graffiti .tag { text-shadow: 0 0 8px rgba(255,255,255,.35); color: #fff; }
-.graffiti .tag::before { border-color: #fff; box-shadow: 0 0 6px rgba(255,255,255,.5); }
 
 #tilt {
   position: fixed; right: var(--pad); top: max(8px, env(safe-area-inset-top)); z-index: 3; color: var(--faint);

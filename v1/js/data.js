@@ -2,6 +2,7 @@
 
 export const OWNER = {
   name: "The New Urban Kid",
+  person: "Shashank Penumatcha",
   line: "Builder of games, tools and AI agent systems.",
   github: "https://github.com/thenewurbankid-web",
 };
@@ -60,7 +61,6 @@ export const WORLDS = [
     ],
     preview: "assets/ruckus.webp",
     look: "ember",
-    graffiti: true,
   },
   {
     id: "line",

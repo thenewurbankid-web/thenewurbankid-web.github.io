@@ -322,12 +322,14 @@ async function start() {
       for (const ch of word) { const s = document.createElement("span"); s.className = "ch"; s.textContent = ch === " " ? " " : ch; s.style.transitionDelay = `${(i++) * 0.07}s`; w.appendChild(s); }
       title.appendChild(w); title.appendChild(document.createTextNode(" "));
     }
+    const by = document.createElement("span"); by.className = "by"; by.setAttribute("aria-hidden", "true"); by.textContent = OWNER.person;
+    title.appendChild(by);
   })();
   hint.textContent = coarse ? "Swipe to orbit · tap a world" : "Drag to orbit · click a world · arrows and Enter";
 
   const labels = new Map();
   for (const d of [...WORLDS, ...MOONS]) {
-    const a = document.createElement("a"); a.className = "lbl" + (d.graffiti ? " graffiti" : ""); a.href = `#${d.id}`; a.textContent = d.name;
+    const a = document.createElement("a"); a.className = "lbl"; a.href = `#${d.id}`; a.textContent = d.name;
     a.addEventListener("click", (e) => { e.preventDefault(); openBody(d.id); });
     labelsEl.appendChild(a); labels.set(d.id, a);
   }
@@ -348,7 +350,7 @@ async function start() {
   }
   function showPanel(d) {
     about.classList.remove("in"); about.hidden = true;
-    panel.classList.remove("in"); panel.classList.toggle("graffiti", !!d.graffiti);
+    panel.classList.remove("in");
     $("p-kicker").textContent = d.kicker || (d.moons ? "World · two moons" : "World");
     $("p-name").textContent = d.name; $("p-pitch").textContent = d.pitch;
     $("p-facts").replaceChildren(...d.facts.map((f) => { const li = document.createElement("li"); li.textContent = f; return li; }));
