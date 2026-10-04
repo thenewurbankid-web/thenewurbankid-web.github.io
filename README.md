@@ -5,7 +5,7 @@ The portfolio of The New Urban Kid, Shashank Penumatcha.
 **v2** (the site root) is a hip-hop producer's home studio at night, seen first person. It is built from real
 photos on planes and simple boxes at real depths in one WebGL scene (three.js 0.170.0 from jsDelivr), lit only by
 the practical lights: the desk lamp, the glow of the CRT, the MPC pads and two red LEDs. At the centre, the producer
-sits at the desk with headphones on, seen from behind, still apart from a slow breath while the MPC pads pulse. Focus or tap them for **About**: Shashank Penumatcha, The New Urban Kid, what the projects are, and GitHub.
+sits at the desk in a black snapback, seen from behind, still apart from a slow breath while the MPC pads pulse. Focus or tap them for **About**: Shashank Penumatcha, The New Urban Kid, what the projects are, and GitHub.
 Each piece of gear is a project:
 
 - **Orbit**: the CRT, glowing with the Orbit space scene
@@ -50,6 +50,6 @@ Opening `index.html` straight from disk will not work, because browsers block ES
 - `assets/room/{lg,sm}/`: textures for desktops and phones (phones load `sm`, at most 1024 px)
 - `assets/CREDITS.md`: source, author, licence and edits for every photo and texture
 - `tools/build_assets.py`: makes `assets/room/` from the source photos (Pillow, numpy, scipy)
-- `tools/build_producer.py`: makes the producer cut-out (also needs rembg)
+- `tools/build_producer.py`: makes the producer cut-out from `assets/src/` (not committed; also needs rembg)
 - `tools/shoot-v2.cjs`, `tools/shoot-v1.cjs`: Playwright screenshots into `qa/` (kept local)
 - `v1/`: the solar-system site

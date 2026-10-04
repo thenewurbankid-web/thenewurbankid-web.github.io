@@ -341,7 +341,7 @@ function frame() {
   camera.position.copy(camState.pos); camera.lookAt(camState.look);
   if (Math.abs(camera.fov - camState.fov) > 1e-4) { camera.fov = camState.fov; camera.updateProjectionMatrix(); }
   // depth of field: rest focus on the CRT, push-in focus on the object
-  const restFocus = camera.position.distanceTo(room.center("orbit", v3)) * 0.82;
+  const restFocus = camera.position.distanceTo(room.center("orbit", v3)) * 0.74;
   const wantDist = focus.target ?? restFocus;
   const wantAp = state.open ? (state.open === "crate" ? 3.5 : 2.4) : (camera.aspect < 1 ? 0.55 : 0.8);
   const kf = 1 - Math.exp(-dt * 2.4);

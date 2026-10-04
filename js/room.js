@@ -149,7 +149,7 @@ const LAYOUT = {
     lamp: [-0.92, 0, -0.84], mpc: [-0.2, 0, 0.42], mpcYaw: 0.08, tt: [0.33, 0, 0.12], ttYaw: -0.14,
     win: [0.3, 1.02, 0.5, 0.42], cork: [-0.33, 1.0, 0.52, 0.38], flyer: [0.45, 0.56, 0.24, 0.33],
     crate: [-0.36, -0.44, 1.02], crateW: 0.55, crateTilt: -1.05,
-    prod: [0.03, -0.3, 1.0], prodH: 0.76,
+    prod: [0.03, -0.07, 1.0], prodH: 0.62,
   },
   L: {
     cam: [0, 0.92, 2.2], look: [0, 0.24, -0.4], fov: 40, desk: [-1.9, 0.8],
@@ -157,7 +157,7 @@ const LAYOUT = {
     lamp: [-1.42, 0, -0.8], mpc: [-0.36, 0, 0.14], mpcYaw: 0.08, tt: [0.36, 0, -0.04], ttYaw: -0.12,
     win: [0.36, 0.96, 0.62, 0.48], cork: [-0.6, 0.92, 0.62, 0.44], flyer: [1.0, 0.6, 0.3, 0.41],
     crate: [1.06, -0.36, 0.16], crateW: 0.72, crateTilt: -0.95,
-    prod: [-0.02, -0.3, 0.96], prodH: 0.78,
+    prod: [-0.02, -0.07, 0.96], prodH: 0.64,
   },
 };
 
@@ -304,7 +304,7 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     uniforms: {
       map: { value: tex.producer }, uNeck: { value: pm.neckV }, uBreath: { value: 0 },
       uHover: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / tex.producer.image.width, 1 / tex.producer.image.height) },
-      uKey: { value: new THREE.Color(1.0, 0.62, 0.36) }, uRim: { value: new THREE.Color(0.42, 0.62, 1.0) }, uRimI: { value: 1 }, uRimR: { value: tex.producer.image.width > 700 ? 4.5 : 3.0 },
+      uKey: { value: new THREE.Color(1.0, 0.62, 0.36) }, uRim: { value: new THREE.Color(0.42, 0.62, 1.0) }, uRimI: { value: 1 }, uRimR: { value: tex.producer.image.width > 800 ? 3.0 : 2.2 },
     },
     vertexShader: /* glsl */ `
       uniform float uNeck, uBreath; varying vec2 vUv;
@@ -336,10 +336,10 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
         float up = clamp(dir.y * 0.3 + 0.4, 0.0, 1.0);              // shoulders and headphones catch the CRT
         // warm key falls off from the lamp side; the far side drops into the dark
         float key = mix(1.0, 0.35, smoothstep(0.1, 0.95, vUv.x)) * mix(0.55, 1.0, smoothstep(0.15, 0.7, vUv.y));
-        vec3 col = c.rgb * uKey * key * 1.15;
-        col += c.rgb * vec3(0.10, 0.12, 0.16);                       // a little cool fill from the screen
-        col += uRim * rim * up * (1.0 - left * 0.6) * 0.16 * uRimI;
-        col += uKey * rim * left * 0.1;
+        vec3 col = c.rgb * uKey * key * 1.9;
+        col += c.rgb * vec3(0.16, 0.18, 0.24);                       // a little cool fill from the screen
+        col += uRim * rim * up * (1.0 - left * 0.6) * 0.07 * uRimI;
+        col += uKey * rim * left * 0.04;
         col *= 1.0 + uHover * 0.55;
         col += vec3(1.0, 0.8, 0.6) * rim * uHover * 0.12;
         gl_FragColor = vec4(col, c.a);
@@ -391,8 +391,8 @@ export async function buildRoom({ tex, meta, canvases, reduced }) {
     const dk = v("desk"); desk.scale.x = edge.scale.x = dk[1] - dk[0]; desk.position.x = edge.position.x = (dk[0] + dk[1]) / 2; deskEnd.position.x = dk[1] - 0.02;
     const pr = v("prod"), ph = s("prodH");
     producer.position.set(pr[0], pr[1], pr[2]); producer.scale.set(ph, ph, ph);
-    chair.position.set(pr[0] + 0.01, pr[1] + 0.0, pr[2] + 0.07);
-    chairShade.position.set(pr[0], pr[1] + 0.2, pr[2] + 0.02);
+    chair.position.set(pr[0] + 0.01, pr[1] - 0.08, pr[2] + 0.07);
+    chairShade.position.set(pr[0], pr[1] + 0.12, pr[2] + 0.02);
     crate.position.set(...v("crate")); crate.scale.setScalar(s("crateW")); crate.rotation.x = s("crateTilt");
     const M = mpc.position, T = tt.position, C = crt.position;
     cable(cables[0], [[M.x + 0.1, 0.03, M.z - 0.2], [M.x + 0.14, 0.004, M.z - 0.32], [M.x + 0.05, 0.004, -0.5], [C.x - 0.1, 0.004, -0.88], [C.x - 0.2, 0.15, -0.98]]);
